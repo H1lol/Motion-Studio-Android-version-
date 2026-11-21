@@ -883,6 +883,12 @@ Java_com_motionstudio_app_native_NativeEngine_nativeEffectRemove(JNIEnv*, jobjec
 }
 
 JNIEXPORT jboolean JNICALL
+Java_com_motionstudio_app_native_NativeEngine_nativeEffectMove(JNIEnv*, jobject, jint track, jint clip,
+                                                              jint from, jint to) {
+    return ms_effect_move(track, clip, from, to) == 0 ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL
 Java_com_motionstudio_app_native_NativeEngine_nativeEffectSetParam(JNIEnv* env, jobject, jint track, jint clip,
                                                                   jint index, jstring name, jfloat value) {
     const char* utf = name ? env->GetStringUTFChars(name, nullptr) : nullptr;

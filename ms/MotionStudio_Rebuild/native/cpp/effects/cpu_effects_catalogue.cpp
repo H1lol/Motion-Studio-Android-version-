@@ -434,6 +434,7 @@ bool cpu_effect_try(const std::string& id,
   // Warps and screens live in cpu_effects_screen.cpp so this dispatcher stays
   // a list of names rather than a second implementation file.
   if (cpu_effect_screen_try(id, in, out, params)) return true;
+  if (cpu_effect_motion_try(id, in, out, params)) return true;
   return false;
 }
 

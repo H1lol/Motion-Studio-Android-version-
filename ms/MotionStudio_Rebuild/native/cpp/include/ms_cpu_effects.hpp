@@ -76,6 +76,22 @@ Error cpu_scanlines(const ImageBuffer& in, ImageBuffer& out,
 Error cpu_vhs(const ImageBuffer& in, ImageBuffer& out,
               float amount, float tracking, int seed);
 
+// Implemented in cpu_effects_motion.cpp: motion, lens and light-break effects.
+Error cpu_motion_blur(const ImageBuffer& in, ImageBuffer& out,
+                      float distance, float angle_deg, int samples);
+Error cpu_fisheye(const ImageBuffer& in, ImageBuffer& out,
+                  float amount, float zoom, float cx, float cy);
+Error cpu_glitch(const ImageBuffer& in, ImageBuffer& out,
+                 float amount, int bands, int seed);
+Error cpu_particles(const ImageBuffer& in, ImageBuffer& out,
+                    int count, float size, float speed, float time, int seed);
+
+/** Tries the motion/lens/light effects; returns true when it wrote `out`. */
+bool cpu_effect_motion_try(const std::string& effect_id,
+                           const ImageBuffer& in,
+                           ImageBuffer& out,
+                           const std::unordered_map<std::string, double>& params);
+
 /** Tries the warp/screen effects; returns true when it wrote `out`. */
 bool cpu_effect_screen_try(const std::string& effect_id,
                            const ImageBuffer& in,

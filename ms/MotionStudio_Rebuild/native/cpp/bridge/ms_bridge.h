@@ -291,6 +291,8 @@ int ms_proxy_is_enabled(void);
 // Returns the new effect's stack index, or -1 on failure.
 int ms_effect_add(int track_id, int clip_id, const char* base_id);
 int ms_effect_remove(int track_id, int clip_id, int index);
+// Reorders the stack: the effect at `from` lands at `to`. 0 on success.
+int ms_effect_move(int track_id, int clip_id, int from, int to);
 int ms_effect_set_param(int track_id, int clip_id, int index, const char* name, float value);
 int ms_effect_set_enabled(int track_id, int clip_id, int index, int enabled);
 

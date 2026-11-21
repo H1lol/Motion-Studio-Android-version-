@@ -65,6 +65,31 @@ int main() {
     check(e.set_effect_enabled(track, clip, 0, false), "effect disabled");
     check(e.add_effect(track, clip, "vignette") == 1, "second effect at index 1");
 
+    // Stack reordering: the effect at `from` lands at `to`.
+    check(e.add_effect(track, clip, "sepia") == 2, "third effect at index 2");
+    check(e.move_effect(track, clip, 2, 0), "move sepia to the top");
+    check(e.project().find_clip(track, clip)->motion.effects[0].id == "sepia", "sepia first");
+    check(e.project().find_clip(track, clip)->motion.effects[1].id == "gaussian_blur",
+          "blur pushed down one");
+    check(e.move_effect(track, clip, 0, 2), "move sepia back to the bottom");
+    check(e.project().find_clip(track, clip)->motion.effects[2].id == "sepia", "sepia last");
+    check(!e.move_effect(track, clip, 3, 0), "out of range move rejected");
+    check(!e.move_effect(track, clip, 0, -1), "negative target rejected");
+    check(!e.move_effect(track, clip + 999, 0, 1), "unknown clip rejected");
+    check(e.project().find_clip(track, clip)->motion.effects.size() == 3, "no effect lost");
+    e.project().undo();
+    check(e.project().find_clip(track, clip)->motion.effects[0].id == "sepia",
+          "undo puts the old order back");
+    check(e.move_effect(track, clip, 0, 0), "no-op move succeeds");
+    // Drop the sepia that was only there for the reorder checks; the round-trip
+    // assertions below expect the original blur-then-vignette order.
+    e.remove_effect(track, clip, 0);
+    check(e.project().find_clip(track, clip)->motion.effects.size() == 2, "back to two effects");
+    check(e.project().find_clip(track, clip)->motion.effects[0].id == "gaussian_blur",
+          "blur back in front");
+    check(e.project().find_clip(track, clip)->motion.effects[1].id == "vignette",
+          "vignette back at the end");
+
     // Round-trip: effects must survive save/load.
     const std::string json = e.project_to_json();
     check(json.find("\"effects\"") != std::string::npos, "effects serialized");

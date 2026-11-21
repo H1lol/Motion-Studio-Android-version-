@@ -538,6 +538,9 @@ int ms_effect_add(int track_id, int clip_id, const char* base_id) {
 int ms_effect_remove(int track_id, int clip_id, int index) {
     return ms::Engine::instance().remove_effect(track_id, clip_id, index) ? 0 : -1;
 }
+int ms_effect_move(int track_id, int clip_id, int from, int to) {
+    return ms::Engine::instance().move_effect(track_id, clip_id, from, to) ? 0 : -1;
+}
 int ms_effect_set_param(int track_id, int clip_id, int index, const char* name, float value) {
     return (name && ms::Engine::instance().set_effect_param(track_id, clip_id, index, name, value))
                ? 0

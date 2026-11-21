@@ -1,5 +1,65 @@
 # Changelog
 
+## Unreleased — effect stack order
+
+### Added
+- **Reordering.** A clip's effect stack can be rearranged: `Engine::move_effect(track,
+  clip, from, to)` removes the entry at `from` and inserts it at `to`, so the moved
+  effect ends up exactly at the requested slot. Order runs top to bottom, matching the
+  order `cpu_effect_apply` walks it, so a blur can sit under a glitch instead of only
+  over it. The move is one undo step and drops the frame cache; the parameters, enabled
+  flag and id travel with the effect because the whole `EffectOp` moves
+- `ms_effect_move` on the C bridge and `nativeEffectMove` in the JNI bridge expose it to
+  the app; `EditorEngine.moveEffect` marks the project dirty and reports the new slot
+- `EffectsSheet` gains ▲/▼ buttons per applied effect, disabled at the ends of the stack,
+  plus a one-line hint that the stack runs top to bottom. Reordering or removing an
+  effect clears the local slider drafts, which were keyed by stack index and would
+  otherwise show the previous effect's positions
+
+### Verified
+- `ms_edit_test` (extended): moving an effect to the top, to the bottom, to its own
+  index, out of range, to a negative index and onto an unknown clip; a move is one undo
+  step that restores the old order; and the effects-serialised round trip still sees
+  blur-then-vignette after the reorder checks. All checks pass
+
+## Unreleased — motion, lens and light
+
+### Added
+- **Motion blur.** `motion_blur` accumulates up to 64 bilinear taps across a shutter
+  distance at any angle, centred on each pixel so a static frame does not drift. The
+  accumulation runs on premultiplied coverage, so it inherits the alpha fix that made
+  Gaussian and box blur stop darkening soft edges; a zero distance is a byte-for-byte
+  passthrough
+- **Lens warp.** `fisheye` inverse-maps each destination pixel through a radial
+  `1 + amount·r²` scale around a movable centre, with zoom. It samples the outside as
+  empty rather than clamping, so a strong warp clears the corners instead of smearing
+  the border pixel across the frame; amount 0 with zoom 1 is the identity
+- **Glitch.** `glitch` slips horizontal bands sideways, tears a minority of them about
+  twice as far, and separates the channels by up to 8 px so hard edges fringe. The row
+  offset, tear selection and fringe are all seeded, so a frame renders identically on
+  every pass; coverage travels with the tear, and colour never appears under zero alpha
+- **Particles.** `particles` stamps up to 512 seeded emitters with a quadratic falloff
+  into a separate light buffer and adds it once, so crossing sparks sum like light
+  instead of overwriting like paint. Warm and cool emitters mix; time and speed move the
+  field; added light raises coverage so the compositor cannot multiply it back down
+- `cpu_effects_motion.cpp` holds the four behind the same premultiplied plane helpers as
+  the warp/screen family. `EffectsSheet` lists them under **Stylise**, **Warp** and
+  **Screen** with sliders matching the dispatcher defaults; the catalogue is 36 effects
+- `docs/MISSING_FEATURES_2026-11-12.md` still governs what is absent from the app; Nova
+  Editor's published feature list was used only to pick which operations to add
+
+### Provenance
+- No decompiled class file, resource, shader, string or parameter text from Nova Editor
+  was read into this tree. The effects are original implementations of standard image
+  operations, written against public descriptions of what the operations do
+
+### Verified
+- `ms_effects_motion_test` (new): the zero settings are exact identities, a directional
+  blur leaves an opaque white frame white and keeps transparent regions empty, a strong
+  fisheye clears its corners, a glitch keeps colour out of transparent pixels, and the
+  particle field is deterministic, adds coverage and never removes it. `ms_effects_screen_test`,
+  `ms_effects_catalogue_test` and `ms_effects_alpha_test` still pass against the same objects
+
 ## Unreleased — eight warp and screen effects
 
 ### Added

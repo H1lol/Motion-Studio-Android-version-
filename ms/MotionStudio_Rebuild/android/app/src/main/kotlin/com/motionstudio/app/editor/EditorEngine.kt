@@ -1376,6 +1376,18 @@ class EditorEngine(
         return true
     }
 
+    fun moveEffect(from: Int, to: Int): Boolean {
+        val (t, c) = selection() ?: return false
+        if (from == to) return true
+        val effects = selectedEffects
+        if (from !in effects.indices || to !in effects.indices) return false
+        if (!NativeEngine.nativeEffectMove(t, c, from, to)) return false
+        markDirty()
+        reload()
+        status = "Moved ${effects[from].id.replace('_', ' ')} to slot ${to + 1}"
+        return true
+    }
+
     fun setEffectParam(index: Int, name: String, value: Float): Boolean {
         val (t, c) = selection() ?: return false
         val ok = NativeEngine.nativeEffectSetParam(t, c, index, name, value)

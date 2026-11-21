@@ -1,5 +1,6 @@
 package com.motionstudio.app.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -106,6 +107,20 @@ val MsEffects = listOf(
         listOf(p("size", "Size", 1f, 64f, 8f)), "Stylise"),
     EffectDef("vignette", "Vignette", "Edge falloff",
         listOf(p("strength", "Strength", 0f, 1f, 0.6f), p("radius", "Radius", 0.1f, 1.5f, 1f)), "Stylise"),
+    EffectDef("motion_blur", "Motion Blur", "Directional shutter smear",
+        listOf(
+            p("distance", "Distance", 0f, 64f, 12f),
+            p("angle", "Angle", -180f, 180f, 0f),
+            p("samples", "Samples", 1f, 64f, 16f),
+        ), "Stylise"),
+    EffectDef("particles", "Particles", "Additive sparks rising through frame",
+        listOf(
+            p("count", "Count", 0f, 256f, 64f),
+            p("size", "Size", 1f, 32f, 6f),
+            p("speed", "Speed", 0f, 2f, 0.6f),
+            p("time", "Time", 0f, 60f, 0f),
+            p("seed", "Seed", 1f, 16f, 1f),
+        ), "Stylise"),
 
     // ---- Warp ----
     EffectDef("chromatic_aberration", "Chromatic Aberration", "Radial RGB split, red out / blue in",
@@ -135,6 +150,13 @@ val MsEffects = listOf(
             p("frequency", "Frequency", 0.1f, 32f, 6f),
             p("phase", "Phase", -360f, 360f, 0f),
         ), "Warp"),
+    EffectDef("fisheye", "Fisheye", "Barrel lens warp",
+        listOf(
+            p("amount", "Amount", -0.9f, 1f, 0.5f),
+            p("zoom", "Zoom", 0.5f, 2f, 1f),
+            p("center_x", "Centre X", 0f, 1f, 0.5f),
+            p("center_y", "Centre Y", 0f, 1f, 0.5f),
+        ), "Warp"),
 
     // ---- Screen ----
     EffectDef("halftone", "Halftone", "Rotated dot screen from luma",
@@ -148,6 +170,12 @@ val MsEffects = listOf(
             p("spacing", "Spacing", 2f, 24f, 4f),
             p("strength", "Strength", 0f, 1f, 0.45f),
             p("phase", "Phase", -360f, 360f, 0f),
+        ), "Screen"),
+    EffectDef("glitch", "Glitch", "Band slips, torn rows, channel fringe",
+        listOf(
+            p("amount", "Amount", 0f, 1f, 0.5f),
+            p("bands", "Bands", 4f, 64f, 24f),
+            p("seed", "Seed", 1f, 16f, 1f),
         ), "Screen"),
     EffectDef("vhs", "VHS Tape", "Wobble, chroma bleed, tracking band",
         listOf(
@@ -199,7 +227,15 @@ fun EffectsSheet(engine: EditorEngine, onDismiss: () -> Unit) {
             LazyColumn(Modifier.fillMaxWidth().height(430.dp)) {
                 if (clipName != null && applied.isNotEmpty()) {
                     item {
-                        Text("APPLIED", color = MsColors.textMuted, fontSize = 9.sp, fontFamily = MsFonts.mono)
+                        Column(Modifier.padding(bottom = 2.dp)) {
+                            Text("APPLIED", color = MsColors.textMuted, fontSize = 9.sp, fontFamily = MsFonts.mono)
+                            Text(
+                                "Runs top to bottom \u00b7 \u25b2\u25bc reorder",
+                                color = MsColors.textMuted,
+                                fontSize = 9.sp,
+                                fontFamily = MsFonts.mono,
+                            )
+                        }
                     }
                     items(applied.size) { index ->
                         val effect = applied[index]
@@ -219,11 +255,40 @@ fun EffectsSheet(engine: EditorEngine, onDismiss: () -> Unit) {
                                         fontSize = 11.sp,
                                     )
                                 }
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier.padding(horizontal = 6.dp),
+                                ) {
+                                    Text(
+                                        "\u25b2",
+                                        fontSize = 10.sp,
+                                        color = if (index > 0) MsColors.textSecondary else MsColors.textMuted,
+                                        modifier = Modifier
+                                            .clickable(enabled = index > 0) {
+                                                if (engine.moveEffect(index, index - 1)) drafts.clear()
+                                            }
+                                            .padding(4.dp),
+                                    )
+                                    Text(
+                                        "\u25bc",
+                                        fontSize = 10.sp,
+                                        color = if (index < applied.size - 1) MsColors.textSecondary
+                                        else MsColors.textMuted,
+                                        modifier = Modifier
+                                            .clickable(enabled = index < applied.size - 1) {
+                                                if (engine.moveEffect(index, index + 1)) drafts.clear()
+                                            }
+                                            .padding(4.dp),
+                                    )
+                                }
                                 Switch(
                                     checked = effect.enabled,
                                     onCheckedChange = { engine.setEffectEnabled(index, it) },
                                 )
-                                TextButton(onClick = { engine.removeEffect(index) }) {
+                                TextButton(onClick = {
+                                    engine.removeEffect(index)
+                                    drafts.clear()
+                                }) {
                                     Text("Remove", color = MsColors.error, fontSize = 11.sp)
                                 }
                             }

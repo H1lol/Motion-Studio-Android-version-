@@ -21,6 +21,7 @@ set(MS_CORE_SOURCES
   effects/cpu_effects_catalogue.cpp
   effects/cpu_effects_extra.cpp
   effects/cpu_effects_screen.cpp
+  effects/cpu_effects_motion.cpp
   effects/effect_stack.cpp
   effects/msp/msp_registry.cpp
   effects/store/effect_store.cpp
@@ -179,6 +180,9 @@ target_link_libraries(ms_effects_alpha_test PRIVATE ms_core)
 add_executable(ms_effects_screen_test tools/ms_effects_screen_test.cpp)
 target_link_libraries(ms_effects_screen_test PRIVATE ms_core)
 
+add_executable(ms_effects_motion_test tools/ms_effects_motion_test.cpp)
+target_link_libraries(ms_effects_motion_test PRIVATE ms_core)
+
 add_executable(ms_engine_audio_test tools/ms_engine_audio_test.cpp)
 target_link_libraries(ms_engine_audio_test PRIVATE motionstudio_native)
 
@@ -213,6 +217,7 @@ add_test(NAME ms_grade_test COMMAND ms_grade_test)
 add_test(NAME ms_clip_look_test COMMAND ms_clip_look_test)
 add_test(NAME ms_effects_alpha_test COMMAND ms_effects_alpha_test)
 add_test(NAME ms_effects_screen_test COMMAND ms_effects_screen_test)
+add_test(NAME ms_effects_motion_test COMMAND ms_effects_motion_test)
 set_tests_properties(
   ms_studio_test ms_pass345_deep ms_pass6_test ms_11_16_test ms_17_22_test
   ms_23_30_test ms_audio_fx_test ms_audio_playback_test ms_graph_safety_test ms_export_profile_test

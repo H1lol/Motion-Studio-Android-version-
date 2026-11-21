@@ -252,6 +252,7 @@ object NativeEngine {
     // Clip effect stack
     external fun nativeEffectAdd(trackId: Int, clipId: Int, baseId: String): Int
     external fun nativeEffectRemove(trackId: Int, clipId: Int, index: Int): Boolean
+    external fun nativeEffectMove(trackId: Int, clipId: Int, from: Int, to: Int): Boolean
     external fun nativeEffectSetParam(trackId: Int, clipId: Int, index: Int, name: String, value: Float): Boolean
     external fun nativeEffectSetEnabled(trackId: Int, clipId: Int, index: Int, enabled: Boolean): Boolean
 

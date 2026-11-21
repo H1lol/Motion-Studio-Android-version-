@@ -130,6 +130,8 @@ public:
     // Clip effect stack (index = position in the clip's stack).
     int  add_effect(TrackId track, ClipId clip, const std::string& base_id);
     bool remove_effect(TrackId track, ClipId clip, int index);
+    /** Moves the effect at `from` so it ends up at `to`; order runs top to bottom. */
+    bool move_effect(TrackId track, ClipId clip, int from, int to);
     bool set_effect_param(TrackId track, ClipId clip, int index, const std::string& name, float value);
     bool set_effect_enabled(TrackId track, ClipId clip, int index, bool enabled);
     void invalidate_frames();

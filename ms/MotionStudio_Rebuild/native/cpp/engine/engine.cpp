@@ -1375,6 +1375,27 @@ bool Engine::remove_effect(TrackId track, ClipId clip, int index) {
     return false;
 }
 
+bool Engine::move_effect(TrackId track, ClipId clip, int from, int to) {
+    if (!project_) return false;
+    TrackInfo* t = project_->find_track(track);
+    if (!t) return false;
+    for (auto& c : t->clips) {
+        if (c.id != clip) continue;
+        const int count = static_cast<int>(c.motion.effects.size());
+        if (from < 0 || from >= count) return false;
+        if (to < 0 || to >= count) return false;
+        if (from == to) return true;
+        project_->push_undo();
+        EffectOp moved = std::move(c.motion.effects[from]);
+        c.motion.effects.erase(c.motion.effects.begin() + from);
+        c.motion.effects.insert(c.motion.effects.begin() + to, std::move(moved));
+        project_->mark_dirty();
+        invalidate_frames();
+        return true;
+    }
+    return false;
+}
+
 bool Engine::set_effect_param(TrackId track, ClipId clip, int index, const std::string& name, float value) {
     if (!project_ || name.empty()) return false;
     TrackInfo* t = project_->find_track(track);
