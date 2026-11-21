@@ -54,8 +54,13 @@ private:
    */
   void render_clip_into(const ClipInfo& clip, TimeSec time, int w, int h, ImageBuffer& dst);
 
-  /** A clip's effect stack, grade and per-clip LUT, on pixels already in `buf`. */
-  void apply_clip_look(const ClipInfo& clip, ImageBuffer& buf, ImageBuffer& tmp);
+  /**
+   * A clip's effect stack, grade and per-clip LUT, on pixels already in `buf`.
+   * `clip_local` drives the effect parameter curves; pass the clip-local time of
+   * the frame being built.
+   */
+  void apply_clip_look(const ClipInfo& clip, TimeSec clip_local, ImageBuffer& buf,
+                       ImageBuffer& tmp);
 
   /** Parsed `.cube` cache: a look is read from disk once, not once per frame. */
   const Lut3D* lut_for(const std::string& path);

@@ -1,5 +1,90 @@
 # Changelog
 
+## Unreleased — three finishing looks
+
+### Added
+- **Zoom blur.** `zoom_blur` averages up to 64 bilinear taps along the ray from a
+  movable centre through each pixel, centred on the pixel so a static frame does not
+  drift. It works on premultiplied coverage, so an opaque white frame stays white and
+  no pixel with zero coverage carries colour; amount 0 is a byte-for-byte passthrough
+- **Duotone.** `duotone` maps luma onto a dark-to-light colour ramp with seven knobs and
+  a mix back to the original. Luma is measured on straight colour, so a half-covered
+  edge is not mapped towards the dark end as it would be from premultiplied values; the
+  clip's alpha is untouched
+- **Pencil sketch.** `sketch` runs a Sobel gradient over luma and places ink on paper,
+  with ink strength, paper level and mix. Flat areas stay clean white, edges go dark,
+  and transparent areas stay empty
+- `cpu_effects_looks.cpp` holds the three behind the same premultiplied-plane helpers as
+  the motion and screen families and is hooked into `cpu_effect_try`. `EffectsSheet`
+  lists them under **Colour**, **Stylise** and **Warp** with sliders matching the
+  dispatcher defaults; the catalogue is 39 effects
+
+### Provenance
+- Original implementations of standard image operations. No shader, source file,
+  parameter text or asset from Nova Editor or any other editor was copied
+
+### Verified
+- `ms_effects_looks_test` (new): all three zero settings are exact identities; a zoom
+  smear leaves an opaque white frame white and never puts colour under zero coverage; a
+  duotone maps black and white onto the configured dark and light colours within two
+  levels and keeps alpha; a sketch keeps flat paper clean, inks an edge, preserves
+  coverage and is deterministic; every id resolves through the catalogue dispatcher
+
+## Unreleased — effect parameter automation
+
+### Added
+- **Animated effect knobs.** Every effect parameter can carry its own curve.
+  `EffectOp::curves` maps a parameter name to an `AnimCurve` in clip-local seconds,
+  the same clock the transform keys use. While a curve holds keys it drives the
+  parameter; the value in `params` stays the resting value the slider edits, so a
+  knob you have not keyed keeps working exactly as before
+- **Per-frame evaluation.** `EffectStack::apply` takes an optional clip-local time and
+  resolves each animated parameter through `EffectOp::params_at` before dispatching the
+  effect, so a blur radius, fisheye amount or particle speed can change across one
+  clip. `TimelinePlayer::apply_clip_look` passes the frame's clip-local time for clips
+  and for adjustment layers alike
+- **Editing API.** `Engine::add_effect_keyframe`, `clear_effect_keyframes`,
+  `effect_keyframe_count`, `effect_keyframe_at`, `set_effect_keyframe` and
+  `sample_effect_param` cover authoring, reading, retiming, easing and curve sampling.
+  Adding a key at an instant that already has one replaces that key instead of stacking
+  a duplicate, because the UI adds a key on every tap. Structure edits are undoable and
+  drop the frame cache; negative times clamp to zero
+- **Persistence.** Effect objects in `.msproj` gain a `curves` array of
+  `{name, keys:[[time, value, interp]]}`; empty curves are not written, so documents
+  from earlier builds load unchanged and older builds ignore the new field
+- **App surface.** `ms_effect_keyframe_*` on the C bridge, `nativeEffectKeyframe*` in
+  the JNI bridge, and `EditorEngine.addEffectKeyframe` / `effectKeyframes` /
+  `setEffectKeyframe` / `clearEffectKeyframes`. Each parameter row in `EffectsSheet`
+  gains a `◆+` button that keys the current slider value at the playhead and a `◇n`
+  counter that clears the curve
+
+### Verified
+- `ms_edit_test` (extended): two keys on a blur radius, the curve driving the midpoint
+  while the static value stays 8; samples hit both ends; a same-instant add replaces
+  instead of duplicating; retiming with an ease stores its interpolation; keys survive
+  the project JSON round trip; clear turns the curve off and undo brings it back;
+  clearing an unkeyed parameter and keying an unknown effect are rejected; a negative
+  time clamps. A 4×4 opacity stack renders transparent at t=0 and opaque at t=2 from the
+  same op, proving the stack resolves curves per frame. All checks pass
+
+## Unreleased — effect stack clipboard
+
+### Added
+- **Reusable looks.** `Engine::copy_effects` snapshots a clip's whole stack and
+  `paste_effects` writes it onto another clip, replacing its stack or appending a copy.
+  Ids, resting values, enable flags and every parameter curve travel together, so a
+  pasted look animates the same way the original does. Both are undoable and drop the
+  frame cache. The clipboard is engine-session state, not part of the document
+- `ms_effect_copy` / `ms_effect_paste` / `ms_effect_clipboard_count` on the C bridge,
+  `nativeEffectCopy` / `nativeEffectPaste` / `nativeEffectClipboardCount` in JNI, and
+  `EditorEngine.copyEffects` / `pasteEffects` / `effectClipboardCount`. `EffectsSheet`
+  gains a STACK row with COPY FX and, once something is copied, PASTE FX
+
+### Verified
+- `ms_edit_test` (extended): a two-effect stack is copied, pasted onto a fresh clip in
+  order, and the pasted blur still carries its two-key radius curve; appending doubles
+  the stack to four, undo returns it to two, and pasting onto a missing clip fails
+
 ## Unreleased — effect stack order
 
 ### Added

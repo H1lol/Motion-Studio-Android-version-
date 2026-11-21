@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstdio>
 #include <string>
+#include <vector>
 
 using namespace ms;
 
@@ -112,6 +113,117 @@ int main() {
     check(std::fabs(e.project().find_clip(track, clip)->start - 7.0) < 1e-6, "move to 7");
     e.project().undo();
     check(std::fabs(e.project().find_clip(track, clip)->start - before) < 1e-6, "undo restores start");
+
+    // Effect parameter automation: a curve per (effect, parameter), in
+    // clip-local seconds, overriding the static value while it has keys.
+    {
+        check(e.add_effect_keyframe(track, clip, 0, "radius", 0.0, 0.0),
+              "first radius key");
+        check(e.add_effect_keyframe(track, clip, 0, "radius", 2.0, 20.0),
+              "second radius key");
+        check(e.effect_keyframe_count(track, clip, 0, "radius") == 2, "two radius keys");
+        const ClipInfo* ac = e.project().find_clip(track, clip);
+        check(ac && ac->motion.effects[0].animated("radius"), "radius reports animated");
+        check(ac && std::fabs(ac->motion.effects[0].param_at("radius", 1.0) - 10.0) < 1e-4,
+              "curve drives the value at the midpoint");
+        double resting_radius = -1.0;
+        if (ac) {
+            const auto& resting = ac->motion.effects[0].params;
+            const auto resting_it = resting.find("radius");
+            if (resting_it != resting.end()) resting_radius = resting_it->second;
+        }
+        check(std::fabs(resting_radius - 8.0) < 1e-4, "static value stays the resting value");
+
+        float curve[5] = {0.f, 0.f, 0.f, 0.f, 0.f};
+        check(e.sample_effect_param(track, clip, 0, "radius", 0.0, 2.0, curve, 5),
+              "curve samples");
+        check(std::fabs(curve[0] - 0.0f) < 1e-3f && std::fabs(curve[4] - 20.0f) < 1e-3f,
+              "samples hit both ends");
+
+        // A second tap at the same instant retimes/revalues instead of stacking.
+        check(e.add_effect_keyframe(track, clip, 0, "radius", 2.0, 4.0),
+              "same-instant key accepted");
+        check(e.effect_keyframe_count(track, clip, 0, "radius") == 2,
+              "same instant does not duplicate");
+        double kt = 0.0, kv = 0.0;
+        int ki = 0;
+        check(e.effect_keyframe_at(track, clip, 0, "radius", 1, &kt, &kv, &ki), "key readable");
+        check(std::fabs(kv - 4.0) < 1e-6, "same-instant add replaced the value");
+        check(e.set_effect_keyframe(track, clip, 0, "radius", 1, 2.0, 20.0, 1),
+              "key retimed and eased");
+        check(e.effect_keyframe_at(track, clip, 0, "radius", 1, &kt, &kv, &ki) && ki == 1,
+              "interpolation stored");
+
+        // Curves travel with the document.
+        const std::string automation_json = e.project_to_json();
+        check(automation_json.find("\"curves\"") != std::string::npos, "curves serialized");
+        check(e.load_project_json(automation_json), "reload with curves");
+        check(e.effect_keyframe_count(track, clip, 0, "radius") == 2, "keys reload");
+        check(e.effect_keyframe_at(track, clip, 0, "radius", 0, &kt, &kv, &ki) &&
+                  std::fabs(kv) < 1e-6,
+              "reloaded key keeps its value");
+
+        check(e.clear_effect_keyframes(track, clip, 0, "radius"), "keys cleared");
+        check(!e.project().find_clip(track, clip)->motion.effects[0].animated("radius"),
+              "curve off after clear");
+        e.project().undo();
+        check(e.effect_keyframe_count(track, clip, 0, "radius") == 2, "undo brings keys back");
+        check(!e.clear_effect_keyframes(track, clip, 0, "no_such_param"),
+              "clearing an unkeyed parameter is a no-op");
+        check(!e.add_effect_keyframe(track, clip, 9, "radius", 0.0, 1.0),
+              "unknown effect rejected");
+        check(e.add_effect_keyframe(track, clip, 0, "radius", -4.0, 1.0),
+              "negative time clamps to zero");
+    }
+
+    // The stack resolves curves per frame, so one op renders differently at two
+    // clip-local times while its static parameter stays put.
+    {
+        ImageBuffer white;
+        white.allocate(4, 4, PixelFormat::RGBA8);
+        white.clear(1.f, 1.f, 1.f, 1.f);
+        std::vector<EffectOp> stack(1);
+        stack[0].id = "opacity";
+        stack[0].params["opacity"] = 1.0;
+        stack[0].curves["opacity"].add(0.0, 0.0);
+        stack[0].curves["opacity"].add(2.0, 1.0);
+        ImageBuffer early, late;
+        check(EffectStack::apply(stack, white, early, 0.0).ok(), "stack applies at t=0");
+        check(EffectStack::apply(stack, white, late, 2.0).ok(), "stack applies at t=2");
+        const int a_early = early.valid() ? early.data()[3] : -1;
+        const int a_late = late.valid() ? late.data()[3] : -1;
+        check(a_early < 8 && a_late > 240, "curve changes the rendered alpha over time");
+    }
+
+    // Copy a look from one shot to another: ids, resting values, enable flags
+    // and every parameter curve travel together.
+    {
+        check(e.copy_effects(track, clip) == 2, "copied the two-effect stack");
+        check(e.effect_clipboard_count() == 2, "clipboard holds the stack");
+
+        ClipInfo c3;
+        c3.name = "Clip C";
+        c3.start = 20.0;
+        c3.duration = 1.0;
+        c3.source_in = 0.0;
+        c3.source_out = 1.0;
+        c3.motion.ensure_defaults();
+        const ClipId clip_c = e.project().add_clip(track, c3);
+        check(clip_c != 0, "paste target clip added");
+
+        check(e.paste_effects(track, clip_c) == 2, "pasted two effects");
+        const ClipInfo* pc = e.project().find_clip(track, clip_c);
+        check(pc && pc->motion.effects.size() == 2, "target has the pasted stack");
+        check(pc && pc->motion.effects[0].id == "gaussian_blur", "pasted order preserved");
+        check(pc && pc->motion.effects[0].animated("radius") &&
+                  pc->motion.effects[0].curves.at("radius").keys().size() == 2,
+              "pasted stack carries the curves");
+        check(e.paste_effects(track, clip_c, true) == 4, "append stacks another copy");
+        e.project().undo();
+        check(e.project().find_clip(track, clip_c)->motion.effects.size() == 2,
+              "undo restores the pasted stack");
+        check(e.paste_effects(track, clip + 999) < 0, "pasting onto a missing clip fails");
+    }
 
     // Transitions between two adjacent clips
     {

@@ -86,6 +86,21 @@ Error cpu_glitch(const ImageBuffer& in, ImageBuffer& out,
 Error cpu_particles(const ImageBuffer& in, ImageBuffer& out,
                     int count, float size, float speed, float time, int seed);
 
+// Implemented in cpu_effects_looks.cpp: finishing looks.
+Error cpu_zoom_blur(const ImageBuffer& in, ImageBuffer& out,
+                    float amount, int samples, float cx, float cy);
+Error cpu_duotone(const ImageBuffer& in, ImageBuffer& out,
+                  float dark_r, float dark_g, float dark_b,
+                  float light_r, float light_g, float light_b, float mix);
+Error cpu_sketch(const ImageBuffer& in, ImageBuffer& out,
+                 float strength, float paper, float mix);
+
+/** Tries the finishing looks; returns true when it wrote `out`. */
+bool cpu_effect_looks_try(const std::string& effect_id,
+                          const ImageBuffer& in,
+                          ImageBuffer& out,
+                          const std::unordered_map<std::string, double>& params);
+
 /** Tries the motion/lens/light effects; returns true when it wrote `out`. */
 bool cpu_effect_motion_try(const std::string& effect_id,
                            const ImageBuffer& in,

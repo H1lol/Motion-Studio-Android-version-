@@ -17,6 +17,34 @@ struct EffectOp {
   std::string id; // "gaussian_blur", "invert", "brightness_contrast"
   std::unordered_map<std::string, double> params;
   bool enabled = true;
+  /**
+   * Per-parameter automation, keyed by parameter name. Times are clip-local
+   * seconds, the same clock the transform keys use. While a curve holds keys it
+   * overrides the resting value in `params`, so dragging a slider still changes
+   * what an un-keyed parameter does without fighting the animation.
+   */
+  std::unordered_map<std::string, AnimCurve> curves;
+
+  bool animated(const std::string& name) const {
+    const auto it = curves.find(name);
+    return it != curves.end() && !it->second.empty();
+  }
+
+  /** Curve value when animated, else the static parameter, else `fallback`. */
+  double param_at(const std::string& name, double clip_local, double fallback = 0.0) const {
+    if (animated(name)) return curves.find(name)->second.eval(clip_local);
+    const auto it = params.find(name);
+    return it != params.end() ? it->second : fallback;
+  }
+
+  /** Parameters as they are at `clip_local`, curves resolved over the statics. */
+  std::unordered_map<std::string, double> params_at(double clip_local) const {
+    std::unordered_map<std::string, double> out = params;
+    for (const auto& kv : curves) {
+      if (!kv.second.empty()) out[kv.first] = kv.second.eval(clip_local);
+    }
+    return out;
+  }
 };
 
 struct ClipMotion {
@@ -52,8 +80,14 @@ struct ClipMotion {
 
 class EffectStack {
 public:
+  /**
+   * Applies the enabled effects in stack order. `clip_local` is the clip-local
+   * time in seconds used to evaluate parameter curves; a negative value means
+   * "no automation", which keeps the stack usable from still-frame callers.
+   */
   static Error apply(const std::vector<EffectOp>& effects,
-                     const ImageBuffer& in, ImageBuffer& out);
+                     const ImageBuffer& in, ImageBuffer& out,
+                     double clip_local = -1.0);
 };
 
 } // namespace ms

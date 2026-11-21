@@ -4,7 +4,8 @@
 namespace ms {
 
 Error EffectStack::apply(const std::vector<EffectOp>& effects,
-                         const ImageBuffer& in, ImageBuffer& out) {
+                         const ImageBuffer& in, ImageBuffer& out,
+                         double clip_local) {
   if (effects.empty()) {
     if (!out.allocate(in.width(), in.height(), in.format()))
       return Error::make(ErrorCode::OutOfMemory, "effect out");
@@ -17,7 +18,11 @@ Error EffectStack::apply(const std::vector<EffectOp>& effects,
   bool any = false;
   for (const auto& fx : effects) {
     if (!fx.enabled) continue;
-    Error e = cpu_effect_apply(fx.id, *cur, *dst, fx.params);
+    // An animated parameter is resolved here, per frame: the stored value stays
+    // the resting value a slider edits, and the curve only wins while it has
+    // keys. With no clip-local time the statics are used unchanged.
+    const auto params = clip_local >= 0.0 ? fx.params_at(clip_local) : fx.params;
+    Error e = cpu_effect_apply(fx.id, *cur, *dst, params);
     (void)e; // unknown effects still write passthrough
     if (!dst->valid()) {
       if (!dst->allocate(cur->width(), cur->height(), cur->format()))

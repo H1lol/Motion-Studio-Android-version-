@@ -158,11 +158,12 @@ static void composite_premul(const ImageBuffer& src, ImageBuffer& dst) {
 // already in `buf`, using `tmp` as the effect stack's destination. Called for a
 // single clip's frame, and for an adjustment layer where `buf` is everything the
 // tracks below have composited so far.
-void TimelinePlayer::apply_clip_look(const ClipInfo& clip, ImageBuffer& buf, ImageBuffer& tmp) {
+void TimelinePlayer::apply_clip_look(const ClipInfo& clip, TimeSec clip_local, ImageBuffer& buf,
+                                     ImageBuffer& tmp) {
   // An empty stack used to copy the whole frame into a fresh buffer for no
   // reason; with no enabled effect there is nothing to do at all.
   if (!clip.motion.effects.empty()) {
-    Error fx = EffectStack::apply(clip.motion.effects, buf, tmp);
+    Error fx = EffectStack::apply(clip.motion.effects, buf, tmp, clip_local);
     if (fx.ok() && tmp.valid()) buf.swap(tmp);
   }
 
@@ -253,7 +254,7 @@ void TimelinePlayer::render_clip_into(const ClipInfo& clip, TimeSec time, int W,
       apply_mask_inplace(frame, mask_img, MaskMode::Alpha);
   }
 
-  apply_clip_look(clip, frame, alt);
+  apply_clip_look(clip, local, frame, alt);
 
   const float op = static_cast<float>(
       clip.opacity * (clip.motion.opacity.empty() ? 1.0 : clip.motion.opacity_at(local)));
@@ -327,7 +328,10 @@ Error TimelinePlayer::render_frame(TimeSec t, ImageBuffer& out) {
       // blend and it is not composited over `out`. scratch_[4] is free here —
       // render_clip_into has finished with it by the time this loop advances.
       if (clip.is_adjustment) {
-        apply_clip_look(clip, out, scratch_[4]);
+        // Its curves follow the same clip-local clock as the clips below it.
+        const double max_local = std::max(0.0, clip.duration * clip.speed - 1e-3);
+        const double local = std::clamp((t - clip.start) * clip.speed, 0.0, max_local);
+        apply_clip_look(clip, local, out, scratch_[4]);
         continue;
       }
       ImageBuffer& clip_buf = scratch_[2];

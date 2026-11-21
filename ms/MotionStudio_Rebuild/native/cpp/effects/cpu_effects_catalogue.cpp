@@ -435,6 +435,7 @@ bool cpu_effect_try(const std::string& id,
   // a list of names rather than a second implementation file.
   if (cpu_effect_screen_try(id, in, out, params)) return true;
   if (cpu_effect_motion_try(id, in, out, params)) return true;
+  if (cpu_effect_looks_try(id, in, out, params)) return true;
   return false;
 }
 

@@ -256,6 +256,31 @@ object NativeEngine {
     external fun nativeEffectSetParam(trackId: Int, clipId: Int, index: Int, name: String, value: Float): Boolean
     external fun nativeEffectSetEnabled(trackId: Int, clipId: Int, index: Int, enabled: Boolean): Boolean
 
+    // Effect parameter automation (clip-local seconds; interp = CurveInterp)
+    external fun nativeEffectKeyframeAdd(
+        trackId: Int, clipId: Int, index: Int, param: String,
+        time: Double, value: Double, interp: Int,
+    ): Boolean
+    external fun nativeEffectKeyframeClear(trackId: Int, clipId: Int, index: Int, param: String): Boolean
+    external fun nativeEffectKeyframeCount(trackId: Int, clipId: Int, index: Int, param: String): Int
+    /** Reads one key into [time, value, interp]; same shape as nativeKeyframeGet. */
+    external fun nativeEffectKeyframeGet(
+        trackId: Int, clipId: Int, index: Int, param: String, key: Int, out: DoubleArray,
+    ): Boolean
+    external fun nativeEffectKeyframeSet(
+        trackId: Int, clipId: Int, index: Int, param: String,
+        key: Int, time: Double, value: Double, interp: Int,
+    ): Boolean
+    external fun nativeEffectKeyframeSample(
+        trackId: Int, clipId: Int, index: Int, param: String,
+        t0: Double, t1: Double, out: FloatArray, bins: Int,
+    ): Boolean
+
+    // Effect stack clipboard: copy returns the stack size, paste the new size.
+    external fun nativeEffectCopy(trackId: Int, clipId: Int): Int
+    external fun nativeEffectPaste(trackId: Int, clipId: Int, append: Boolean): Int
+    external fun nativeEffectClipboardCount(): Int
+
     // Display look (3D .cube LUT applied by the engine to the preview frame)
     external fun nativeLookLoad(path: String): Boolean
     external fun nativeLookClear()

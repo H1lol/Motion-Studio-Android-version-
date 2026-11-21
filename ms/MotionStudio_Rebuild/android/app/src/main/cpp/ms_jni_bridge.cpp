@@ -903,6 +903,95 @@ Java_com_motionstudio_app_native_NativeEngine_nativeEffectSetEnabled(JNIEnv*, jo
     return ms_effect_set_enabled(track, clip, index, enabled) == 0 ? JNI_TRUE : JNI_FALSE;
 }
 
+// ---- Effect parameter automation -----------------------------------------
+JNIEXPORT jboolean JNICALL
+Java_com_motionstudio_app_native_NativeEngine_nativeEffectKeyframeAdd(
+    JNIEnv* env, jobject, jint track, jint clip, jint index, jstring param, jdouble time,
+    jdouble value, jint interp) {
+    const char* utf = param ? env->GetStringUTFChars(param, nullptr) : nullptr;
+    const bool ok =
+        utf && ms_effect_keyframe_add(track, clip, index, utf, time, value, interp) == 0;
+    if (utf) env->ReleaseStringUTFChars(param, utf);
+    return ok ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_motionstudio_app_native_NativeEngine_nativeEffectKeyframeClear(
+    JNIEnv* env, jobject, jint track, jint clip, jint index, jstring param) {
+    const char* utf = param ? env->GetStringUTFChars(param, nullptr) : nullptr;
+    const bool ok = utf && ms_effect_keyframe_clear(track, clip, index, utf) == 0;
+    if (utf) env->ReleaseStringUTFChars(param, utf);
+    return ok ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_motionstudio_app_native_NativeEngine_nativeEffectKeyframeCount(
+    JNIEnv* env, jobject, jint track, jint clip, jint index, jstring param) {
+    const char* utf = param ? env->GetStringUTFChars(param, nullptr) : nullptr;
+    const int count = utf ? ms_effect_keyframe_count(track, clip, index, utf) : 0;
+    if (utf) env->ReleaseStringUTFChars(param, utf);
+    return count;
+}
+
+// out = [time, value, interp]
+JNIEXPORT jboolean JNICALL
+Java_com_motionstudio_app_native_NativeEngine_nativeEffectKeyframeGet(
+    JNIEnv* env, jobject, jint track, jint clip, jint index, jstring param, jint key,
+    jdoubleArray out) {
+    if (!param || !out || env->GetArrayLength(out) < 3) return JNI_FALSE;
+    const char* utf = env->GetStringUTFChars(param, nullptr);
+    double values[3] = {0.0, 0.0, 0.0};
+    const bool ok = utf && ms_effect_keyframe_get(track, clip, index, utf, key, values) == 0;
+    if (utf) env->ReleaseStringUTFChars(param, utf);
+    if (!ok) return JNI_FALSE;
+    env->SetDoubleArrayRegion(out, 0, 3, values);
+    return JNI_TRUE;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_motionstudio_app_native_NativeEngine_nativeEffectKeyframeSet(
+    JNIEnv* env, jobject, jint track, jint clip, jint index, jstring param, jint key,
+    jdouble time, jdouble value, jint interp) {
+    const char* utf = param ? env->GetStringUTFChars(param, nullptr) : nullptr;
+    const bool ok = utf &&
+                    ms_effect_keyframe_set(track, clip, index, utf, key, time, value, interp) == 0;
+    if (utf) env->ReleaseStringUTFChars(param, utf);
+    return ok ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_motionstudio_app_native_NativeEngine_nativeEffectKeyframeSample(
+    JNIEnv* env, jobject, jint track, jint clip, jint index, jstring param, jdouble t0,
+    jdouble t1, jfloatArray out, jint bins) {
+    if (!param || !out || bins < 2 || env->GetArrayLength(out) < bins) return JNI_FALSE;
+    const char* utf = env->GetStringUTFChars(param, nullptr);
+    std::vector<float> scratch(static_cast<size_t>(bins), 0.f);
+    const bool ok =
+        utf && ms_effect_keyframe_sample(track, clip, index, utf, t0, t1, scratch.data(), bins) == 0;
+    if (utf) env->ReleaseStringUTFChars(param, utf);
+    if (!ok) return JNI_FALSE;
+    env->SetFloatArrayRegion(out, 0, bins, scratch.data());
+    return JNI_TRUE;
+}
+
+// ---- Effect stack clipboard ----------------------------------------------
+JNIEXPORT jint JNICALL
+Java_com_motionstudio_app_native_NativeEngine_nativeEffectCopy(JNIEnv*, jobject, jint track,
+                                                              jint clip) {
+    return ms_effect_copy(track, clip);
+}
+
+JNIEXPORT jint JNICALL
+Java_com_motionstudio_app_native_NativeEngine_nativeEffectPaste(JNIEnv*, jobject, jint track,
+                                                               jint clip, jint append) {
+    return ms_effect_paste(track, clip, append);
+}
+
+JNIEXPORT jint JNICALL
+Java_com_motionstudio_app_native_NativeEngine_nativeEffectClipboardCount(JNIEnv*, jobject) {
+    return ms_effect_clipboard_count();
+}
+
 JNIEXPORT jdouble JNICALL
 Java_com_motionstudio_app_native_NativeEngine_nativePerfFrameMs(JNIEnv*, jobject) {
     return ms_perf_frame_ms();

@@ -134,6 +134,42 @@ public:
     bool move_effect(TrackId track, ClipId clip, int from, int to);
     bool set_effect_param(TrackId track, ClipId clip, int index, const std::string& name, float value);
     bool set_effect_enabled(TrackId track, ClipId clip, int index, bool enabled);
+
+    // ---- Effect parameter automation --------------------------------------
+    // A curve per (effect, parameter), in clip-local seconds like the transform
+    // keys. While a curve holds keys it drives the parameter and the stored
+    // static value becomes the resting value a slider edits. Adding a key at a
+    // time that already has one retimes/revalues that key instead of stacking a
+    // duplicate, so tapping the key button twice does not corrupt the curve.
+    bool add_effect_keyframe(TrackId track, ClipId clip, int index,
+                             const std::string& param, TimeSec time, double value,
+                             int interp = 0);
+    bool clear_effect_keyframes(TrackId track, ClipId clip, int index,
+                                const std::string& param);
+    int  effect_keyframe_count(TrackId track, ClipId clip, int index,
+                               const std::string& param) const;
+    bool effect_keyframe_at(TrackId track, ClipId clip, int index,
+                            const std::string& param, int key, double* time,
+                            double* value, int* interp) const;
+    bool set_effect_keyframe(TrackId track, ClipId clip, int index,
+                             const std::string& param, int key, double time,
+                             double value, int interp);
+    /** Fills `out` with `bins` samples of one parameter curve over [t0, t1]. */
+    bool sample_effect_param(TrackId track, ClipId clip, int index,
+                             const std::string& param, double t0, double t1,
+                             float* out, int bins) const;
+
+    // ---- Effect stack clipboard -------------------------------------------
+    // Engine-session state, like a normal clipboard: not saved with the document.
+    // A copied stack carries effect ids, resting values, enable flags and every
+    // parameter curve, so pasting a look onto another shot reproduces it exactly.
+    /** Copies the clip's stack; returns its size, or -1 when the clip is unknown. */
+    int copy_effects(TrackId track, ClipId clip);
+    /** Pastes onto the clip, replacing its stack (or appending). Returns the new
+     *  stack size, or -1 on failure. Undoable. */
+    int paste_effects(TrackId track, ClipId clip, bool append = false);
+    int effect_clipboard_count() const;
+
     void invalidate_frames();
 
     // Master grade (applied to the preview before the look) and scopes.
@@ -281,6 +317,7 @@ private:
     bool grade_active_ = false;
     PerformanceMonitor perf_;
     AutosaveController autosave_;
+    std::vector<EffectOp> effect_clipboard_;
 };
 
 } // namespace ms

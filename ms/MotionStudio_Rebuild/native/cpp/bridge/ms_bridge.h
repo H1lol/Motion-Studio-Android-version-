@@ -296,6 +296,28 @@ int ms_effect_move(int track_id, int clip_id, int from, int to);
 int ms_effect_set_param(int track_id, int clip_id, int index, const char* name, float value);
 int ms_effect_set_enabled(int track_id, int clip_id, int index, int enabled);
 
+// Effect parameter automation. Times are clip-local seconds; interp follows
+// ms::CurveInterp (0 linear, 1 hold, 2-4 ease, 5 smooth). A parameter with at
+// least one key is driven by its curve at render time.
+int ms_effect_keyframe_add(int track_id, int clip_id, int index, const char* param,
+                           double time, double value, int interp);
+int ms_effect_keyframe_clear(int track_id, int clip_id, int index, const char* param);
+int ms_effect_keyframe_count(int track_id, int clip_id, int index, const char* param);
+// Reads a key into [time, value, interp]; returns 0 on success.
+int ms_effect_keyframe_get(int track_id, int clip_id, int index, const char* param,
+                           int key, double* out3);
+int ms_effect_keyframe_set(int track_id, int clip_id, int index, const char* param,
+                           int key, double time, double value, int interp);
+// Fills `bins` samples of the curve over [t0, t1]; returns 0 on success.
+int ms_effect_keyframe_sample(int track_id, int clip_id, int index, const char* param,
+                              double t0, double t1, float* out, int bins);
+
+// Effect stack clipboard (session-scoped). copy returns the number of effects,
+// paste returns the clip's new stack size; both return -1 on failure.
+int ms_effect_copy(int track_id, int clip_id);
+int ms_effect_paste(int track_id, int clip_id, int append);
+int ms_effect_clipboard_count(void);
+
 #include <stddef.h>
 #include <stdint.h>
 

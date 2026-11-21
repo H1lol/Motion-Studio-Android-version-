@@ -402,6 +402,24 @@ std::string ProjectSession::to_json() const {
           ss << "{\"name\": \"" << esc(kv.first) << "\", \"value\": " << kv.second << "}";
           if (++pi < e.params.size()) ss << ", ";
         }
+        ss << "]";
+        // Per-parameter automation. Only curves with keys are written: an empty
+        // entry is the same as no curve, and an older build reads the rest fine.
+        ss << ", \"curves\": [";
+        bool wrote_curve = false;
+        for (const auto& kv : e.curves) {
+          if (kv.second.empty()) continue;
+          if (wrote_curve) ss << ", ";
+          ss << "{\"name\": \"" << esc(kv.first) << "\", \"keys\": [";
+          const auto& ks = kv.second.keys();
+          for (size_t ki = 0; ki < ks.size(); ++ki) {
+            ss << "[" << ks[ki].time << ", " << ks[ki].value << ", "
+               << static_cast<int>(ks[ki].interp) << "]";
+            if (ki + 1 < ks.size()) ss << ", ";
+          }
+          ss << "]}";
+          wrote_curve = true;
+        }
         ss << "]}";
         if (ei + 1 < c.motion.effects.size()) ss << ", ";
       }
@@ -607,6 +625,11 @@ Error ProjectSession::load_from_json(const std::string& json) {
         for (const auto& po : array_objects(eo, "params")) {
           const std::string pname = extract_string(po, "name");
           if (!pname.empty()) op.params[pname] = extract_number(po, "value");
+        }
+        for (const auto& co2 : array_objects(eo, "curves")) {
+          const std::string cname = extract_string(co2, "name");
+          if (cname.empty()) continue;
+          parse_motion_curve(co2, "keys", op.curves[cname]);
         }
         if (!op.id.empty()) c.motion.effects.push_back(std::move(op));
       }

@@ -1426,6 +1426,161 @@ bool Engine::set_effect_enabled(TrackId track, ClipId clip, int index, bool enab
     return false;
 }
 
+namespace {
+
+EffectOp* effect_op_at(TrackInfo* track_info, ClipId clip, int index) {
+  if (!track_info || index < 0) return nullptr;
+  for (auto& c : track_info->clips) {
+    if (c.id != clip) continue;
+    if (index >= static_cast<int>(c.motion.effects.size())) return nullptr;
+    return &c.motion.effects[index];
+  }
+  return nullptr;
+}
+
+const EffectOp* effect_op_at(const TrackInfo* track_info, ClipId clip, int index) {
+  if (!track_info || index < 0) return nullptr;
+  for (const auto& c : track_info->clips) {
+    if (c.id != clip) continue;
+    if (index >= static_cast<int>(c.motion.effects.size())) return nullptr;
+    return &c.motion.effects[index];
+  }
+  return nullptr;
+}
+
+} // namespace
+
+bool Engine::add_effect_keyframe(TrackId track, ClipId clip, int index,
+                                 const std::string& param, TimeSec time, double value,
+                                 int interp) {
+  if (!project_ || param.empty()) return false;
+  EffectOp* fx = effect_op_at(project_->find_track(track), clip, index);
+  if (!fx) return false;
+  project_->push_undo();
+  AnimCurve& curve = fx->curves[param];
+  const TimeSec at = std::max<TimeSec>(0.0, time);
+  const auto& keys = curve.keys();
+  int existing = -1;
+  for (size_t i = 0; i < keys.size(); ++i) {
+    if (std::fabs(keys[i].time - at) < 1e-6) { existing = static_cast<int>(i); break; }
+  }
+  const auto mode = static_cast<CurveInterp>(std::clamp(interp, 0, 5));
+  if (existing >= 0) {
+    // Same instant twice: the newer value wins, the curve keeps one key per
+    // time. The UI adds a key on every tap, so duplicates were easy to make.
+    curve.set_key(static_cast<size_t>(existing), at, value);
+    curve.set_interp(static_cast<size_t>(existing), mode);
+  } else {
+    curve.add(at, value, mode);
+  }
+  project_->mark_dirty();
+  invalidate_frames();
+  return true;
+}
+
+bool Engine::clear_effect_keyframes(TrackId track, ClipId clip, int index,
+                                    const std::string& param) {
+  if (!project_ || param.empty()) return false;
+  EffectOp* fx = effect_op_at(project_->find_track(track), clip, index);
+  if (!fx) return false;
+  auto it = fx->curves.find(param);
+  if (it == fx->curves.end() || it->second.empty()) return false;
+  project_->push_undo();
+  fx->curves.erase(it);
+  project_->mark_dirty();
+  invalidate_frames();
+  return true;
+}
+
+int Engine::effect_keyframe_count(TrackId track, ClipId clip, int index,
+                                  const std::string& param) const {
+  if (!project_ || param.empty()) return 0;
+  const EffectOp* fx = effect_op_at(project_->find_track(track), clip, index);
+  if (!fx) return 0;
+  const auto it = fx->curves.find(param);
+  return it == fx->curves.end() ? 0 : static_cast<int>(it->second.keys().size());
+}
+
+bool Engine::effect_keyframe_at(TrackId track, ClipId clip, int index,
+                                const std::string& param, int key, double* time,
+                                double* value, int* interp) const {
+  if (!project_ || param.empty() || key < 0) return false;
+  const EffectOp* fx = effect_op_at(project_->find_track(track), clip, index);
+  if (!fx) return false;
+  const auto it = fx->curves.find(param);
+  if (it == fx->curves.end()) return false;
+  const AnimKeyframe* k = it->second.at(static_cast<size_t>(key));
+  if (!k) return false;
+  if (time) *time = k->time;
+  if (value) *value = k->value;
+  if (interp) *interp = static_cast<int>(k->interp);
+  return true;
+}
+
+bool Engine::set_effect_keyframe(TrackId track, ClipId clip, int index,
+                                 const std::string& param, int key, double time,
+                                 double value, int interp) {
+  if (!project_ || param.empty() || key < 0) return false;
+  EffectOp* fx = effect_op_at(project_->find_track(track), clip, index);
+  if (!fx) return false;
+  auto it = fx->curves.find(param);
+  if (it == fx->curves.end() || static_cast<size_t>(key) >= it->second.keys().size())
+    return false;
+  project_->push_undo();
+  it->second.set_key(static_cast<size_t>(key), time, value);
+  it->second.set_interp(static_cast<size_t>(key), static_cast<CurveInterp>(std::clamp(interp, 0, 5)));
+  project_->mark_dirty();
+  invalidate_frames();
+  return true;
+}
+
+bool Engine::sample_effect_param(TrackId track, ClipId clip, int index,
+                                 const std::string& param, double t0, double t1,
+                                 float* out, int bins) const {
+  if (!project_ || param.empty() || !out || bins < 2) return false;
+  const EffectOp* fx = effect_op_at(project_->find_track(track), clip, index);
+  if (!fx) return false;
+  const double step = (t1 - t0) / static_cast<double>(bins - 1);
+  for (int i = 0; i < bins; ++i) {
+    out[i] = static_cast<float>(fx->param_at(param, t0 + step * i, 0.0));
+  }
+  return true;
+}
+
+int Engine::copy_effects(TrackId track, ClipId clip) {
+  if (!project_) return -1;
+  TrackInfo* t = project_->find_track(track);
+  if (!t) return -1;
+  for (const auto& c : t->clips) {
+    if (c.id != clip) continue;
+    effect_clipboard_ = c.motion.effects;
+    return static_cast<int>(effect_clipboard_.size());
+  }
+  return -1;
+}
+
+int Engine::paste_effects(TrackId track, ClipId clip, bool append) {
+  if (!project_ || effect_clipboard_.empty()) return -1;
+  TrackInfo* t = project_->find_track(track);
+  if (!t) return -1;
+  for (auto& c : t->clips) {
+    if (c.id != clip) continue;
+    project_->push_undo();
+    c.motion.ensure_defaults();
+    if (!append) c.motion.effects.clear();
+    c.motion.effects.insert(c.motion.effects.end(), effect_clipboard_.begin(),
+                            effect_clipboard_.end());
+    project_->mark_dirty();
+    invalidate_frames();
+    return static_cast<int>(c.motion.effects.size());
+  }
+  return -1;
+}
+
+int Engine::effect_clipboard_count() const {
+  return static_cast<int>(effect_clipboard_.size());
+}
+
 void Engine::set_frame_callback(FrameCallback cb) { impl_->frame_cb = std::move(cb); }
 
 } // namespace ms

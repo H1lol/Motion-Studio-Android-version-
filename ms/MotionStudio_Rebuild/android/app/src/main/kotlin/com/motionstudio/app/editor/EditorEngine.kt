@@ -1388,6 +1388,49 @@ class EditorEngine(
         return true
     }
 
+    /**
+     * Copies the selected clip's whole effect stack — ids, resting values,
+     * enable flags and parameter curves — so one look can be reused on other
+     * shots. The clipboard lives for the engine session, like a normal clipboard.
+     */
+    fun copyEffects(): Boolean {
+        val (t, c) = selection() ?: run {
+            status = "Select a clip first"
+            return false
+        }
+        val count = NativeEngine.nativeEffectCopy(t, c)
+        if (count < 0) {
+            status = "Could not copy the effect stack"
+            return false
+        }
+        status = if (count == 0) "That clip has no effects to copy"
+        else "Copied $count effect${if (count == 1) "" else "s"}"
+        return count > 0
+    }
+
+    /** Pastes the copied stack over the clip's own (or appends it). */
+    fun pasteEffects(append: Boolean = false): Boolean {
+        val (t, c) = selection() ?: run {
+            status = "Select a clip first"
+            return false
+        }
+        if (NativeEngine.nativeEffectClipboardCount() == 0) {
+            status = "Nothing copied yet"
+            return false
+        }
+        val size = NativeEngine.nativeEffectPaste(t, c, append)
+        if (size < 0) {
+            status = "Could not paste the effect stack"
+            return false
+        }
+        markDirty()
+        reload()
+        status = if (append) "Appended the copied effects" else "Pasted the copied look"
+        return true
+    }
+
+    fun effectClipboardCount(): Int = NativeEngine.nativeEffectClipboardCount()
+
     fun setEffectParam(index: Int, name: String, value: Float): Boolean {
         val (t, c) = selection() ?: return false
         val ok = NativeEngine.nativeEffectSetParam(t, c, index, name, value)
@@ -1396,6 +1439,75 @@ class EditorEngine(
             reload()
         }
         return ok
+    }
+
+    /**
+     * Keys one effect parameter at the playhead. Times are clip-local seconds,
+     * so a key stays on the shot when the clip is moved or retrimmed. Once a
+     * parameter has a key its curve drives it; the slider value is the resting
+     * value used where the curve does not reach.
+     */
+    fun addEffectKeyframe(index: Int, name: String, value: Float, interp: Int = 0): Boolean {
+        val (t, c) = selection() ?: run {
+            status = "Select a clip first"
+            return false
+        }
+        val clip = doc.clipById(t, c) ?: return false
+        val local = (time - clip.start).coerceAtLeast(0.0)
+        if (!NativeEngine.nativeEffectKeyframeAdd(t, c, index, name, local, value.toDouble(), interp)) {
+            status = "Could not key ${name.replace('_', ' ')}"
+            return false
+        }
+        markDirty()
+        reload()
+        status = "${name.replace('_', ' ')} keyed at ${formatTimecode(time)}"
+        return true
+    }
+
+    fun effectKeyframeCount(index: Int, name: String): Int {
+        val (t, c) = selection() ?: return 0
+        return NativeEngine.nativeEffectKeyframeCount(t, c, index, name)
+    }
+
+    /** Every key on one effect parameter, in time order. */
+    fun effectKeyframes(index: Int, name: String): List<KeyPoint> {
+        val (track, clip) = selection() ?: return emptyList()
+        val count = NativeEngine.nativeEffectKeyframeCount(track, clip, index, name)
+        if (count <= 0) return emptyList()
+        val out = ArrayList<KeyPoint>(count)
+        val buf = DoubleArray(3)
+        for (i in 0 until count) {
+            if (NativeEngine.nativeEffectKeyframeGet(track, clip, index, name, i, buf)) {
+                out += KeyPoint(i, buf[0], buf[1], buf[2].toInt())
+            }
+        }
+        return out
+    }
+
+    fun setEffectKeyframe(
+        index: Int,
+        name: String,
+        key: Int,
+        time: Double,
+        value: Double,
+        interp: Int,
+    ): Boolean {
+        val (track, clip) = selection() ?: return false
+        val ok = NativeEngine.nativeEffectKeyframeSet(track, clip, index, name, key, time, value, interp)
+        if (ok) {
+            markDirty()
+            reload()
+        }
+        return ok
+    }
+
+    fun clearEffectKeyframes(index: Int, name: String): Boolean {
+        val (t, c) = selection() ?: return false
+        if (!NativeEngine.nativeEffectKeyframeClear(t, c, index, name)) return false
+        markDirty()
+        reload()
+        status = "${name.replace('_', ' ')} back to a static value"
+        return true
     }
 
     fun setEffectEnabled(index: Int, enabled: Boolean): Boolean {

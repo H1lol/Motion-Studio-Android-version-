@@ -93,6 +93,16 @@ val MsEffects = listOf(
         listOf(p("level", "Level", 0f, 1f, 0.5f)), "Colour"),
     EffectDef("chromakey", "Chroma Key", "Knock out green",
         listOf(p("tolerance", "Tolerance", 0f, 1f, 0.2f)), "Colour"),
+    EffectDef("duotone", "Duotone", "Map luma onto two colours",
+        listOf(
+            p("dark_r", "Dark R", 0f, 1f, 0.06f),
+            p("dark_g", "Dark G", 0f, 1f, 0.09f),
+            p("dark_b", "Dark B", 0f, 1f, 0.16f),
+            p("light_r", "Light R", 0f, 1f, 1f),
+            p("light_g", "Light G", 0f, 1f, 0.86f),
+            p("light_b", "Light B", 0f, 1f, 0.64f),
+            p("mix", "Mix", 0f, 1f, 1f),
+        ), "Colour"),
 
     // ---- Stylise ----
     EffectDef("glow", "Glow", "Blur screened back over the image",
@@ -103,6 +113,12 @@ val MsEffects = listOf(
         listOf(p("amount", "Amount", 0f, 2f, 0.5f)), "Stylise"),
     EffectDef("edge_detect", "Edges", "Sobel gradient",
         listOf(p("amount", "Amount", 0f, 3f, 1f)), "Stylise"),
+    EffectDef("sketch", "Pencil Sketch", "Sobel ink on paper",
+        listOf(
+            p("strength", "Ink", 0f, 8f, 1.6f),
+            p("paper", "Paper", 0.2f, 1f, 1f),
+            p("mix", "Mix", 0f, 1f, 1f),
+        ), "Stylise"),
     EffectDef("pixelate", "Pixelate", "Block mosaic",
         listOf(p("size", "Size", 1f, 64f, 8f)), "Stylise"),
     EffectDef("vignette", "Vignette", "Edge falloff",
@@ -154,6 +170,13 @@ val MsEffects = listOf(
         listOf(
             p("amount", "Amount", -0.9f, 1f, 0.5f),
             p("zoom", "Zoom", 0.5f, 2f, 1f),
+            p("center_x", "Centre X", 0f, 1f, 0.5f),
+            p("center_y", "Centre Y", 0f, 1f, 0.5f),
+        ), "Warp"),
+    EffectDef("zoom_blur", "Zoom Blur", "Radial smear from a centre",
+        listOf(
+            p("amount", "Amount", 0f, 0.9f, 0.25f),
+            p("samples", "Samples", 2f, 64f, 16f),
             p("center_x", "Centre X", 0f, 1f, 0.5f),
             p("center_y", "Centre Y", 0f, 1f, 0.5f),
         ), "Warp"),
@@ -225,12 +248,48 @@ fun EffectsSheet(engine: EditorEngine, onDismiss: () -> Unit) {
             Spacer(Modifier.height(10.dp))
 
             LazyColumn(Modifier.fillMaxWidth().height(430.dp)) {
+                if (clipName != null) {
+                    item {
+                        Row(
+                            Modifier.fillMaxWidth().padding(bottom = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                "STACK",
+                                color = MsColors.textMuted,
+                                fontSize = 9.sp,
+                                fontFamily = MsFonts.mono,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Text(
+                                "COPY FX",
+                                color = MsColors.textSecondary,
+                                fontSize = 9.sp,
+                                fontFamily = MsFonts.mono,
+                                modifier = Modifier
+                                    .clickable { engine.copyEffects() }
+                                    .padding(horizontal = 6.dp, vertical = 3.dp),
+                            )
+                            if (engine.effectClipboardCount() > 0) {
+                                Text(
+                                    "PASTE FX",
+                                    color = MsColors.accentSoft,
+                                    fontSize = 9.sp,
+                                    fontFamily = MsFonts.mono,
+                                    modifier = Modifier
+                                        .clickable { engine.pasteEffects() }
+                                        .padding(horizontal = 6.dp, vertical = 3.dp),
+                                )
+                            }
+                        }
+                    }
+                }
                 if (clipName != null && applied.isNotEmpty()) {
                     item {
                         Column(Modifier.padding(bottom = 2.dp)) {
                             Text("APPLIED", color = MsColors.textMuted, fontSize = 9.sp, fontFamily = MsFonts.mono)
                             Text(
-                                "Runs top to bottom \u00b7 \u25b2\u25bc reorder",
+                                "Runs top to bottom \u00b7 \u25b2\u25bc reorder \u00b7 \u25c6+ keys a value",
                                 color = MsColors.textMuted,
                                 fontSize = 9.sp,
                                 fontFamily = MsFonts.mono,
@@ -296,13 +355,17 @@ fun EffectsSheet(engine: EditorEngine, onDismiss: () -> Unit) {
                                 val key = "$index:${param.name}"
                                 val current = drafts[key]
                                     ?: (effect.params[param.name]?.toFloat() ?: param.default)
+                                // A keyed parameter is driven by its curve; the
+                                // count is shown so an animated value is obvious
+                                // from the stack, not only while scrubbing.
+                                val keyCount = engine.effectKeyframeCount(index, param.name)
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
                                         "${param.label}  ${"%.2f".format(current)}",
                                         color = MsColors.textSecondary,
                                         fontSize = 11.sp,
                                         fontFamily = MsFonts.mono,
-                                        modifier = Modifier.fillMaxWidth(0.34f),
+                                        modifier = Modifier.fillMaxWidth(0.30f),
                                     )
                                     Slider(
                                         value = current.coerceIn(param.min, param.max),
@@ -313,6 +376,34 @@ fun EffectsSheet(engine: EditorEngine, onDismiss: () -> Unit) {
                                         valueRange = param.min..param.max,
                                         modifier = Modifier.weight(1f),
                                     )
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        modifier = Modifier.padding(start = 4.dp),
+                                    ) {
+                                        Text(
+                                            "\u25c6+",
+                                            fontSize = 10.sp,
+                                            color = MsColors.accentSoft,
+                                            modifier = Modifier
+                                                .clickable {
+                                                    engine.addEffectKeyframe(index, param.name, current)
+                                                }
+                                                .padding(3.dp),
+                                        )
+                                        if (keyCount > 0) {
+                                            Text(
+                                                "\u25c7$keyCount",
+                                                fontSize = 9.sp,
+                                                color = MsColors.textMuted,
+                                                fontFamily = MsFonts.mono,
+                                                modifier = Modifier
+                                                    .clickable {
+                                                        engine.clearEffectKeyframes(index, param.name)
+                                                    }
+                                                    .padding(3.dp),
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }

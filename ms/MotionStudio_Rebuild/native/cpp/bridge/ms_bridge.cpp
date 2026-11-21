@@ -549,6 +549,71 @@ int ms_effect_set_param(int track_id, int clip_id, int index, const char* name, 
 int ms_effect_set_enabled(int track_id, int clip_id, int index, int enabled) {
     return ms::Engine::instance().set_effect_enabled(track_id, clip_id, index, enabled != 0) ? 0 : -1;
 }
+// ---- Effect parameter automation ------------------------------------------
+int ms_effect_keyframe_add(int track_id, int clip_id, int index, const char* param,
+                           double time, double value, int interp) {
+    if (!param) return -1;
+    return ms::Engine::instance()
+                   .add_effect_keyframe(track_id, clip_id, index, param, time, value, interp)
+               ? 0
+               : -1;
+}
+
+int ms_effect_keyframe_clear(int track_id, int clip_id, int index, const char* param) {
+    if (!param) return -1;
+    return ms::Engine::instance().clear_effect_keyframes(track_id, clip_id, index, param) ? 0
+                                                                                          : -1;
+}
+
+int ms_effect_keyframe_count(int track_id, int clip_id, int index, const char* param) {
+    if (!param) return 0;
+    return ms::Engine::instance().effect_keyframe_count(track_id, clip_id, index, param);
+}
+
+int ms_effect_keyframe_get(int track_id, int clip_id, int index, const char* param,
+                           int key, double* out3) {
+    if (!param || !out3) return -1;
+    double time = 0.0, value = 0.0;
+    int interp = 0;
+    if (!ms::Engine::instance().effect_keyframe_at(track_id, clip_id, index, param, key, &time,
+                                                  &value, &interp))
+        return -1;
+    out3[0] = time;
+    out3[1] = value;
+    out3[2] = static_cast<double>(interp);
+    return 0;
+}
+
+int ms_effect_keyframe_set(int track_id, int clip_id, int index, const char* param,
+                           int key, double time, double value, int interp) {
+    if (!param) return -1;
+    return ms::Engine::instance()
+                   .set_effect_keyframe(track_id, clip_id, index, param, key, time, value, interp)
+               ? 0
+               : -1;
+}
+
+int ms_effect_keyframe_sample(int track_id, int clip_id, int index, const char* param,
+                              double t0, double t1, float* out, int bins) {
+    if (!param || !out) return -1;
+    return ms::Engine::instance()
+                   .sample_effect_param(track_id, clip_id, index, param, t0, t1, out, bins)
+               ? 0
+               : -1;
+}
+
+int ms_effect_copy(int track_id, int clip_id) {
+    return ms::Engine::instance().copy_effects(track_id, clip_id);
+}
+
+int ms_effect_paste(int track_id, int clip_id, int append) {
+    return ms::Engine::instance().paste_effects(track_id, clip_id, append != 0);
+}
+
+int ms_effect_clipboard_count(void) {
+    return ms::Engine::instance().effect_clipboard_count();
+}
+
 int ms_audio_set_master_gain(float gain_db) {
     ms::Engine& engine = ms::Engine::instance();
     ms::AudioFxParams gain;
