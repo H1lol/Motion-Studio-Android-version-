@@ -391,6 +391,8 @@ std::string ProjectSession::to_json() const {
            << ", \"tx_shadow_alpha\": " << ts.shadow_alpha
            << ", \"tx_box\": " << ts.box_width
            << ", \"tx_rise\": " << ts.rise
+           << ", \"tx_reveal\": " << ts.reveal
+           << ", \"tx_reveal_sec\": " << ts.reveal_sec
            << ", \"tx_upper\": " << (ts.uppercase ? "true" : "false");
       }
       for (size_t ei = 0; ei < c.motion.effects.size(); ++ei) {
@@ -632,6 +634,8 @@ Error ProjectSession::load_from_json(const std::string& json) {
         ts.shadow_alpha = static_cast<float>(extract_number(co, "tx_shadow_alpha", 0.65));
         ts.box_width = static_cast<float>(extract_number(co, "tx_box", 0));
         ts.rise = static_cast<float>(extract_number(co, "tx_rise", 0));
+        ts.reveal = std::clamp(static_cast<int>(extract_number(co, "tx_reveal", 0)), 0, 3);
+        ts.reveal_sec = static_cast<float>(extract_number(co, "tx_reveal_sec", 1));
         ts.uppercase = co.find("\"tx_upper\": true") != std::string::npos;
       }
       for (const auto& eo : array_objects(co, "effects")) {

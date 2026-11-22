@@ -510,6 +510,23 @@ int ms_text_update_clip(int track_id, int clip_id, const char* text, const char*
                ? 0 : -1;
 }
 
+int ms_text_reveal_set(int track_id, int clip_id, int mode, double seconds) {
+    return ms::Engine::instance().set_clip_text_reveal(track_id, clip_id, mode,
+                                                       static_cast<float>(seconds))
+               ? 0 : -1;
+}
+
+int ms_text_reveal_get(int track_id, int clip_id, float* out2) {
+    int mode = 0;
+    float seconds = 0.f;
+    if (!ms::Engine::instance().clip_text_reveal(track_id, clip_id, &mode, &seconds)) return -1;
+    if (out2) {
+        out2[0] = static_cast<float>(mode);
+        out2[1] = seconds;
+    }
+    return 0;
+}
+
 int ms_text_measure(const char* text, const char* font, double size, double box_width,
                     int uppercase, double* out_w, double* out_h, int* out_lines) {
     ms::TextStyle style;

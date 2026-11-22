@@ -1,5 +1,35 @@
 # Changelog
 
+## Unreleased — title reveal presets
+
+### Added
+- **Type-on, word-by-word and line-by-line titles.** `TextStyle` carries a reveal mode
+  and a duration; the rasteriser cuts the string on codepoint, word or line boundaries
+  before laying it out, so a multibyte character is never split in half. The reveal runs
+  on the timeline clock, not the retimed source clock, so a slowed title still types on
+  in the time the ruler shows
+- **Nothing at rest.** A finished reveal is truncated to the whole string, so the last
+  frame is byte-identical to an un-revealed title: there is no permanent fade or offset
+  left behind by turning a preset on
+- **Engine surface.** `set_clip_text_reveal` / `clip_text_reveal`, `ms_text_reveal_set` /
+  `ms_text_reveal_get`, saved as `tx_reveal` and `tx_reveal_sec`. A style edit from the
+  title sheet keeps the current reveal instead of silently dropping it, and the mode and
+  duration are undoable
+- **UI.** `TEXT` gains a **Reveal** row (None / Type on / Word / Line) and a reveal-time
+  slider for the selected title
+
+### Verified
+- `ms_edit_test`: a reveal starts with zero coverage, a half reveal covers part of the
+  title, the finished frame matches the plain render exactly, word and line modes cut on
+  their own boundaries, the mode and duration survive a save/load round trip, a style
+  edit keeps the reveal, and a non-title or an out-of-range mode is rejected
+- `bridge/ms_bridge.cpp` compiles clean under `-fsyntax-only`. Kotlin/JNI and Compose were
+  not compiled here (no Android toolchain in this environment)
+
+### Provenance
+- Original work on the project's own stb_truetype rasteriser; no third-party title
+  animation code or preset was copied
+
 ## Unreleased — clip audio and automation
 
 ### Added

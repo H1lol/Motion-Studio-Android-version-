@@ -1673,6 +1673,30 @@ class EditorEngine(
         return ok
     }
 
+    // ---- Title reveal -------------------------------------------------------
+
+    /** Reveal mode (0 none, 1 type-on, 2 word, 3 line) and its duration. */
+    fun textReveal(trackId: Int, clipId: Int): Pair<Int, Float>? {
+        val out = FloatArray(2)
+        if (!NativeEngine.nativeTextRevealGet(trackId, clipId, out)) return null
+        return out[0].toInt() to out[1]
+    }
+
+    fun setTextReveal(trackId: Int, clipId: Int, mode: Int, seconds: Float): Boolean {
+        val ok = NativeEngine.nativeTextRevealSet(trackId, clipId, mode, seconds)
+        if (ok) {
+            status = when (mode) {
+                1 -> "Type-on title"
+                2 -> "Word-by-word title"
+                3 -> "Line-by-line title"
+                else -> "Reveal off"
+            }
+            markDirty()
+            reload()
+        }
+        return ok
+    }
+
     // ---- Clip audio and automation -----------------------------------------
 
     /** Clip fader and pan, or null when the clip is unknown. */

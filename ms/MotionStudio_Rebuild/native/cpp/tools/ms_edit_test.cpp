@@ -298,6 +298,76 @@ int main() {
         const ms::ClipInfo* restored = e.project().find_clip(text_track, title);
         check(restored && restored->is_text && restored->text == "HELLO", "title survives reload");
         if (restored) check(std::fabs(restored->text_style.size - 96.f) < 1e-3f, "title size survives");
+
+        // Reveals truncate the title as it plays; the finished frame is the same
+        // pixels as an un-revealed title, so the animation adds nothing at rest.
+        auto coverage = [](const ms::ImageBuffer& img) {
+            int n = 0;
+            if (!img.valid()) return n;
+            for (int i = 0; i < img.width() * img.height(); ++i)
+                if (img.data()[i * 4 + 3] > 8) ++n;
+            return n;
+        };
+        ms::TextStyle rev = ts;
+        rev.reveal = 1;
+        ms::ImageBuffer start_i, half_i, full_i, plain_i;
+        check(ms::render_text(start_i, 640, 360, rev, "MOTION STUDIO", 0.0).ok(),
+              "reveal start renders");
+        check(coverage(start_i) == 0, "reveal starts empty");
+        check(ms::render_text(half_i, 640, 360, rev, "MOTION STUDIO", 0.5).ok(),
+              "half reveal renders");
+        check(ms::render_text(full_i, 640, 360, rev, "MOTION STUDIO", 1.0).ok(),
+              "full reveal renders");
+        check(coverage(half_i) > 0 && coverage(half_i) < coverage(full_i),
+              "type-on shows part of the title");
+        check(ms::render_text(plain_i, 640, 360, ts, "MOTION STUDIO").ok(),
+              "plain title renders");
+        check(coverage(plain_i) == coverage(full_i), "finished reveal matches the plain title");
+
+        ms::TextStyle words = ts;
+        words.reveal = 2;
+        ms::ImageBuffer w1;
+        check(ms::render_text(w1, 640, 360, words, "MOTION STUDIO", 0.5).ok(),
+              "word reveal renders");
+        check(coverage(w1) > 0 && coverage(w1) < coverage(plain_i),
+              "word reveal shows one word");
+
+        ms::TextStyle lines = ts;
+        lines.reveal = 3;
+        ms::ImageBuffer l0, lall;
+        check(ms::render_text(l0, 640, 360, lines, "A\nB\nC", 0.34).ok(),
+              "line reveal renders");
+        check(coverage(l0) > 0, "line reveal shows the first line");
+        check(ms::render_text(lall, 640, 360, lines, "A\nB\nC", 1.0).ok(),
+              "line reveal completes");
+        check(coverage(l0) < coverage(lall), "line reveal hides later lines");
+
+        // The reveal is a document property, and a style edit keeps it.
+        check(e.set_clip_text_reveal(text_track, title, 2, 1.5f), "title reveal set");
+        int rmode = -1;
+        float rsec = -1.f;
+        check(e.clip_text_reveal(text_track, title, &rmode, &rsec), "title reveal readable");
+        check(rmode == 2 && std::fabs(rsec - 1.5f) < 1e-4f, "title reveal values");
+        const std::string rjson = e.project_to_json();
+        check(rjson.find("\"tx_reveal\": 2") != std::string::npos, "reveal serialized");
+        check(e.load_project_json(rjson), "reload with a reveal");
+        check(e.clip_text_reveal(text_track, title, &rmode, &rsec) && rmode == 2 &&
+                  std::fabs(rsec - 1.5f) < 1e-4f,
+              "reveal restored");
+        {
+            const ms::ClipInfo* tc = e.project().find_clip(text_track, title);
+            check(tc != nullptr, "restyled title found");
+            if (tc) {
+                const std::string body = tc->text;
+                ms::TextStyle edited = tc->text_style;
+                edited.size = 80.f;
+                check(e.set_clip_text(text_track, title, body, edited), "title restyled");
+                check(e.clip_text_reveal(text_track, title, &rmode, &rsec) && rmode == 2,
+                      "restyling keeps the reveal");
+            }
+        }
+        check(!e.set_clip_text_reveal(track, clip, 1, 1.f), "reveal refused on a non-title");
+        check(!e.set_clip_text_reveal(text_track, title, 4, 1.f), "bad reveal mode refused");
     }
 
     // Undo/redo must actually restore edits — the preview cache is keyed on the

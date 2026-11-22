@@ -28,6 +28,8 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -277,6 +279,58 @@ fun TextSheet(engine: EditorEngine, onDismiss: () -> Unit) {
                         if (engine.selectedIsText()) engine.updateSelectedTitle(text, opts)
                     },
                 )
+            }
+
+            if (editing) {
+                // Reveal animates the title on: the text is truncated as the clip
+                // plays, so the finished frame matches an un-revealed title.
+                var revealMode by remember {
+                    mutableIntStateOf(
+                        engine.textReveal(engine.selectedTrackId, engine.selectedClipId)?.first ?: 0
+                    )
+                }
+                var revealSec by remember {
+                    mutableFloatStateOf(
+                        engine.textReveal(engine.selectedTrackId, engine.selectedClipId)?.second ?: 1f
+                    )
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "Reveal",
+                        color = MsColors.textSecondary,
+                        fontSize = 12.sp,
+                        modifier = Modifier.width(56.dp),
+                    )
+                    listOf("None", "Type on", "Word", "Line").forEachIndexed { index, label ->
+                        TextButton(onClick = {
+                            revealMode = index
+                            engine.setTextReveal(
+                                engine.selectedTrackId,
+                                engine.selectedClipId,
+                                index,
+                                revealSec,
+                            )
+                        }) {
+                            Text(
+                                label,
+                                color = if (revealMode == index) MsColors.accentSoft
+                                else MsColors.textSecondary,
+                                fontSize = 12.sp,
+                            )
+                        }
+                    }
+                }
+                if (revealMode > 0) {
+                    SliderRow("Reveal time", revealSec.toDouble(), 0.2, 6.0) {
+                        revealSec = it.toFloat()
+                        engine.setTextReveal(
+                            engine.selectedTrackId,
+                            engine.selectedClipId,
+                            revealMode,
+                            revealSec,
+                        )
+                    }
+                }
             }
 
             if (!editing) {

@@ -266,12 +266,92 @@ void set_text_color(TextStyle& style, const std::string& hex) {
   }
 }
 
+namespace {
+
+/** Byte offset just past `count` UTF-8 codepoints. */
+size_t utf8_after(const std::string& s, size_t count) {
+  size_t i = 0;
+  size_t seen = 0;
+  while (i < s.size() && seen < count) {
+    size_t j = i;
+    next_codepoint(s, j);
+    if (j <= i) break;
+    i = j;
+    ++seen;
+  }
+  return i;
+}
+
+/**
+ * The part of `text` a reveal shows at `progress`. Cutting on codepoint, word
+ * and line boundaries keeps multibyte characters whole, so a type-on never
+ * paints half a glyph.
+ */
+std::string revealed_text(const std::string& text, int mode, double progress) {
+  if (mode <= 0 || progress >= 1.0) return text;
+  if (progress <= 0.0) return {};
+
+  size_t codepoints = 0;
+  for (size_t i = 0; i < text.size();) {
+    size_t j = i;
+    next_codepoint(text, j);
+    if (j <= i) break;
+    i = j;
+    ++codepoints;
+  }
+
+  if (mode == 1) {
+    const size_t show = static_cast<size_t>(std::ceil(progress * static_cast<double>(codepoints)));
+    return text.substr(0, utf8_after(text, show));
+  }
+
+  if (mode == 2) {
+    // Words are maximal runs of non-space codepoints; a newline also ends one.
+    std::vector<size_t> word_ends; // byte offset just past each word
+    bool in_word = false;
+    size_t i = 0;
+    while (i < text.size()) {
+      size_t j = i;
+      const char32_t cp = next_codepoint(text, j);
+      if (j <= i) break;
+      const bool space = cp == U' ' || cp == U'\t' || cp == U'\n' || cp == U'\r';
+      if (space && in_word) {
+        word_ends.push_back(i);
+        in_word = false;
+      } else if (!space) {
+        in_word = true;
+      }
+      i = j;
+    }
+    if (in_word) word_ends.push_back(text.size());
+    if (word_ends.empty()) return {};
+    const size_t show = static_cast<size_t>(
+        std::ceil(progress * static_cast<double>(word_ends.size())));
+    const size_t at = word_ends[std::min(show, word_ends.size()) - 1];
+    return text.substr(0, at);
+  }
+
+  // Line-by-line: keep whole explicit lines.
+  std::vector<size_t> line_ends;
+  for (size_t i = 0; i < text.size(); ++i) {
+    if (text[i] == '\n') line_ends.push_back(i + 1);
+  }
+  if (line_ends.empty() || line_ends.back() != text.size()) line_ends.push_back(text.size());
+  const size_t show = static_cast<size_t>(
+      std::ceil(progress * static_cast<double>(line_ends.size())));
+  return text.substr(0, line_ends[std::min(show, line_ends.size()) - 1]);
+}
+
+} // namespace
+
 Error render_text(ImageBuffer& out, int w, int h, const TextStyle& style,
-                  const std::string& text) {
+                  const std::string& text, double reveal_progress) {
   if (!out.allocate(w, h, PixelFormat::RGBA8))
     return Error::make(ErrorCode::OutOfMemory, "text buffer");
   out.clear(0.f, 0.f, 0.f, 0.f);
   if (text.empty()) return Error::success();
+  const std::string shown = revealed_text(text, style.reveal, reveal_progress);
+  if (shown.empty()) return Error::success();
 
   const std::string path = resolve_font_path(style);
   if (path.empty())
@@ -284,7 +364,7 @@ Error render_text(ImageBuffer& out, int w, int h, const TextStyle& style,
   const float scale = stbtt_ScaleForPixelHeight(&font->info, size);
   std::vector<Line> lines;
   float max_w = 0.f;
-  layout_lines(*font, style, text, scale, lines, max_w);
+  layout_lines(*font, style, shown, scale, lines, max_w);
   if (lines.empty()) return Error::success();
 
   const float line_h = size * std::max(0.4f, style.line_spacing);

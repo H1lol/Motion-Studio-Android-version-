@@ -44,7 +44,12 @@ Legend: ✅ done in this pass · ❌ still missing · ⚠️ partial / untested 
 
 ### 1. Text editing depth (titles themselves now render)
 Titles are real now: `native/cpp/text/text_render.cpp` rasterises glyphs with stb_truetype, six OFL display faces ship in `assets/text/`, the C ABI has `ms_text_*`, and `TextSheet` edits text, family, size, tracking, line spacing, outline, shadow, wrap width, fill/outline colour, align, anchor and uppercase. A title is an ordinary clip, so keyframed transform, effects, grade and transitions all apply.
-What is still *not* there: per-character or per-word styling (one style per clip), animation presets (type-on, word-by-word), text on a path, curved/warped text, right-to-left shaping and complex-script shaping (stb_truetype has no HarfBuzz, so Arabic/Devanagari will not join correctly), and importing a user font — a SAF picker plus the licence rule that user fonts must never be redistributed.
+Closed since this list was written: reveal presets — type-on, word-by-word and
+line-by-line, with a duration per title.
+What is still *not* there: per-character or per-word styling (one style per clip), text on
+a path, curved/warped text, right-to-left shaping and complex-script shaping (stb_truetype
+has no HarfBuzz, so Arabic/Devanagari will not join correctly), and importing a user font —
+a SAF picker plus the licence rule that user fonts must never be redistributed.
 
 ### 1b. Nobody has looked at a frame
 `tools/ms_shots.cpp` renders real frames to PPM so the compositor output can be inspected without a

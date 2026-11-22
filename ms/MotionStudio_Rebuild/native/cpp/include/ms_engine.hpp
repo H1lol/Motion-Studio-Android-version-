@@ -321,6 +321,13 @@ public:
                          const std::string& text, const TextStyle& style);
     bool set_clip_text(TrackId track, ClipId clip, const std::string& text,
                        const TextStyle& style);
+    /**
+     * Title reveal: 0 none, 1 type-on, 2 word-by-word, 3 line-by-line, over
+     * `seconds` from the clip's start (<= 0 spans the whole clip). Undoable.
+     */
+    bool set_clip_text_reveal(TrackId track, ClipId clip, int mode, float seconds);
+    /** Reads the reveal mode and duration; false when the clip is not a title. */
+    bool clip_text_reveal(TrackId track, ClipId clip, int* mode, float* seconds) const;
     /** Rasterises the title into `out` at the project size (used by export/preview). */
     bool render_title_preview(const std::string& text, const TextStyle& style, ImageBuffer& out);
 

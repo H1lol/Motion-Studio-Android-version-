@@ -1286,13 +1286,54 @@ bool Engine::set_clip_text(TrackId track, ClipId clip, const std::string& text,
     for (auto& c : t->clips) {
         if (c.id != clip) continue;
         project_->push_undo();
+        // The reveal is edited through its own call, and a style edit from the
+        // title sheet carries no reveal, so preserve the current one unless the
+        // incoming style asks for a mode explicitly.
+        const int previous_reveal = c.text_style.reveal;
+        const float previous_reveal_sec = c.text_style.reveal_sec;
         c.is_text = true;
         c.text = text;
         c.text_style = style;
+        if (style.reveal == 0 && previous_reveal != 0) {
+            c.text_style.reveal = previous_reveal;
+            c.text_style.reveal_sec = previous_reveal_sec;
+        }
         if (c.name.empty() || c.name == "Text") c.name = text.size() > 32 ? text.substr(0, 32) : text;
         project_->mark_dirty();
         invalidate_frames();
         return true;
+    }
+    return false;
+}
+
+bool Engine::set_clip_text_reveal(TrackId track, ClipId clip, int mode, float seconds) {
+    if (!project_ || mode < 0 || mode > 3) return false;
+    TrackInfo* t = project_->find_track(track);
+    if (!t) return false;
+    for (auto& c : t->clips) {
+        if (c.id != clip) continue;
+        if (!c.is_text) return false;
+        project_->push_undo();
+        c.text_style.reveal = mode;
+        c.text_style.reveal_sec = seconds > 0.f ? seconds : 0.f;
+        project_->mark_dirty();
+        invalidate_frames();
+        return true;
+    }
+    return false;
+}
+
+bool Engine::clip_text_reveal(TrackId track, ClipId clip, int* mode, float* seconds) const {
+    if (!project_) return false;
+    for (const auto& t : project_->tracks()) {
+        if (t.id != track) continue;
+        for (const auto& c : t.clips) {
+            if (c.id != clip) continue;
+            if (!c.is_text) return false;
+            if (mode) *mode = c.text_style.reveal;
+            if (seconds) *seconds = c.text_style.reveal_sec;
+            return true;
+        }
     }
     return false;
 }

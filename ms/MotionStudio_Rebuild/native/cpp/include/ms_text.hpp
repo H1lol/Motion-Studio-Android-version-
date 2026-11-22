@@ -40,6 +40,14 @@ struct TextStyle {
   float box_width = 0.f;        // px; wraps text when > 0
   float rise = 0.f;             // px above centre (baseline nudge for titles)
   bool  uppercase = false;
+  /**
+   * Title reveal: 0 none, 1 type-on, 2 word-by-word, 3 line-by-line. The reveal
+   * progresses over `reveal_sec` seconds from the clip's start; a value <= 0
+   * spreads the reveal across the whole clip. The text is truncated, not
+   * faded, so the finished frame is byte-identical to no reveal at all.
+   */
+  int   reveal = 0;
+  float reveal_sec = 1.f;
 };
 
 struct TextMetrics {
@@ -66,9 +74,11 @@ bool measure_text(const TextStyle& style, const std::string& text, TextMetrics& 
  * Rasterises `text` into `out` (w×h, RGBA8, transparent background) honouring
  * align/anchor/outline/shadow. Alpha-weighted colour, straight (not premultiplied)
  * because the clip compositor divides by 255 as it blends.
+ *
+ * `reveal_progress` (0..1) drives `style.reveal`; 1 draws the whole title.
  */
 Error render_text(ImageBuffer& out, int w, int h, const TextStyle& style,
-                  const std::string& text);
+                  const std::string& text, double reveal_progress = 1.0);
 
 /** Parses "#rrggbb" / "#rrggbbaa" into the style colour. */
 void set_text_color(TextStyle& style, const std::string& hex);

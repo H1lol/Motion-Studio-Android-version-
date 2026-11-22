@@ -128,6 +128,15 @@ object NativeEngine {
     external fun nativeTrackFxSetParam(trackId: Int, index: Int, name: String, value: Float): Boolean
     external fun nativeTrackFxGetParam(trackId: Int, index: Int, name: String, fallback: Float): Float
 
+    // Title reveal: 0 none, 1 type-on, 2 word-by-word, 3 line-by-line
+    external fun nativeTextRevealSet(
+        trackId: Int,
+        clipId: Int,
+        mode: Int,
+        seconds: Float,
+    ): Boolean
+    external fun nativeTextRevealGet(trackId: Int, clipId: Int, out: FloatArray): Boolean
+
     // Clip audio and its automation (prop 0 gain, 1 pan; clip-local seconds)
     external fun nativeClipAudioSet(trackId: Int, clipId: Int, gain: Float, pan: Float): Boolean
     external fun nativeClipAudioGet(trackId: Int, clipId: Int, out: FloatArray): Boolean

@@ -330,6 +330,23 @@ Java_com_motionstudio_app_native_NativeEngine_nativeTrackFxGetParam(JNIEnv* env,
 
 // ---- Clip audio ----------------------------------------------------------
 JNIEXPORT jboolean JNICALL
+Java_com_motionstudio_app_native_NativeEngine_nativeTextRevealSet(
+        JNIEnv*, jobject, jint track, jint clip, jint mode, jfloat seconds) {
+    return ms_text_reveal_set(track, clip, mode, seconds) == 0 ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_motionstudio_app_native_NativeEngine_nativeTextRevealGet(
+        JNIEnv* env, jobject, jint track, jint clip, jfloatArray out) {
+    if (!out || env->GetArrayLength(out) < 2) return JNI_FALSE;
+    float values[2] = {0.f, 1.f};
+    if (ms_text_reveal_get(track, clip, values) != 0) return JNI_FALSE;
+    env->SetFloatArrayRegion(out, 0, 2, values);
+    return JNI_TRUE;
+}
+
+// ---- Clip audio ----------------------------------------------------------
+JNIEXPORT jboolean JNICALL
 Java_com_motionstudio_app_native_NativeEngine_nativeClipAudioSet(
         JNIEnv*, jobject, jint track, jint clip, jfloat gain, jfloat pan) {
     return ms_clip_audio_set(track, clip, gain, pan) == 0 ? JNI_TRUE : JNI_FALSE;

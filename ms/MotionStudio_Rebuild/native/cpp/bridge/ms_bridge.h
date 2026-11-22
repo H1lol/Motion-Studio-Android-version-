@@ -288,8 +288,13 @@ int ms_text_update_clip(int track_id, int clip_id, const char* text, const char*
                         int uppercase);
 // Text metrics for hit-testing/layout: returns 0 when the font resolves,
 // writing width/height/lines into the out pointers.
-int ms_text_measure(const char* text, const char* font, double size,
-                    double box_width, int uppercase, double* out_w, double* out_h,
+// Title reveal: 0 none, 1 type-on, 2 word-by-word, 3 line-by-line. `seconds`
+// <= 0 spreads the reveal across the whole clip.
+int ms_text_reveal_set(int track_id, int clip_id, int mode, double seconds);
+/** Fills out2 with mode and seconds; -1 when the clip is not a title. */
+int ms_text_reveal_get(int track_id, int clip_id, float* out2);
+
+int ms_text_measure(const char* text, const char* font, double size, double box_width, int uppercase, double* out_w, double* out_h,
                     int* out_lines);
 int ms_transition_remove(int track_id, int id);
 

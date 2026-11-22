@@ -225,7 +225,16 @@ void TimelinePlayer::render_clip_into(const ClipInfo& clip, TimeSec time, int W,
 
   IMediaDecoder* dec = decoder_for(clip.media_id);
   if (clip.is_text) {
-    if (!render_text(alt, W, H, clip.text_style, clip.text).ok() || !alt.valid()) {
+    // A reveal runs on the timeline clock (not the retimed source clock), so a
+    // sped-up or slowed title still types on in the time you see on the ruler.
+    double reveal = 1.0;
+    if (clip.text_style.reveal > 0) {
+      const double span = clip.text_style.reveal_sec > 0.f
+                              ? static_cast<double>(clip.text_style.reveal_sec)
+                              : std::max(0.05, clip.duration);
+      reveal = std::clamp((time - clip.start) / span, 0.0, 1.0);
+    }
+    if (!render_text(alt, W, H, clip.text_style, clip.text, reveal).ok() || !alt.valid()) {
       alt.allocate(W, H);
       alt.clear(0.f, 0.f, 0.f, 0.f);
     }
