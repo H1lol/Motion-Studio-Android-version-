@@ -1,5 +1,33 @@
 # Changelog
 
+## Unreleased — mix loudness meter
+
+### Added
+- **BS.1770 metering.** The timeline mix now has a real loudness meter: K-weighting with
+  the two standard biquads (a ~1.68 kHz high shelf and a ~38 Hz high-pass), 100 ms block
+  energies, and momentary (400 ms), short-term (3 s) and integrated readings with the
+  -70 LUFS absolute gate and the -10 LU relative gate. Per-channel sample peaks are kept
+  since the last reset. Coefficients are recomputed for the rate the host feeds, so a
+  44.1 kHz session is not measured with 48 kHz filters
+- **Measured where it is heard.** The meter runs on the final post-fader, post-insert
+  buffer at the end of `TimelineAudioPlayback::read_pcm`, not on an intermediate mix, and
+  resets on seek and stop so an integrated reading cannot span two unrelated sections
+- **Engine surface.** `audio_meter` fills five floats (peak L, peak R, momentary,
+  short-term, integrated); bridged as `ms_audio_meter`. `MIX` polls it every 120 ms while
+  open and shows a peak bar (red at full scale) and the three LUFS windows
+
+### Verified
+- `ms_loudness_test` (new, in `ctest`): a -20 dBFS stereo 1 kHz sine reads -20.69 LUFS
+  within 1.5 LU in all three windows, doubling the amplitude adds 6.02 LU, mono input
+  feeds both meter channels, silence reads at the -70 floor rather than -inf, reset clears
+  peaks and loudness, and a 44.1 kHz meter reads the same tone as the 48 kHz one
+- `ms_edit_test` still passes with the meter in the playback path; `bridge/ms_bridge.cpp`
+  compiles clean under `-fsyntax-only`. Kotlin/Compose were not compiled here
+
+### Provenance
+- Original implementation from the published BS.1770 coefficient formulas; libebur128 was
+  not copied or linked
+
 ## Unreleased — mask geometry automation
 
 ### Added

@@ -112,7 +112,10 @@ saved with the track and editable from a **CHAIN** chip in `MIX`.
 Closed since this list was written: clip fader and pan are editable from `MIX`, and both
 carry clip-local automation curves that the mixer resolves per sample; the curves and the
 fader are saved with the clip.
-Still missing: master-bus insert automation, sample-rate choice, and loudness metering.
+Closed since this list was written: loudness metering — the final mix is metered to
+BS.1770 (momentary, short-term, gated integrated plus per-channel peaks) and `MIX` shows
+it while open.
+Still missing: master-bus insert automation and sample-rate choice.
 
 ### 6b. Effect catalogue size
 39 CPU effects against Kdenlive's roughly 84 hand-written effect definitions plus 145 MLT avfilter and 118 frei0r entries. Most of that gap is provided by third-party GPL plugins we cannot link; adding them would relicense the app. Audio effects are still the thinnest area: the master bus has six inserts, every track
