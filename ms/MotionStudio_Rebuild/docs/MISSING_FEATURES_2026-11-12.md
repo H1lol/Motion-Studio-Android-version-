@@ -92,7 +92,10 @@ strength was written into RGB while `MaskMode::Alpha` read alpha, which made an 
 no-op and an inverted one hide the whole clip. Also closed: a full-frame mask now honours invert (the
 shared fast path returned white for both polarities), and each mask's mode (Alpha, Luma and their
 inverted forms) is folded into the Add/Subtract combine instead of being ignored. Missing:
-bezier/roto shapes, mask tracking to follow motion, and mask keyframes.
+bezier/roto shapes and mask tracking to follow motion.
+Closed since this list was written: mask keyframes — centre X/Y, width, height and
+feather each carry a clip-local curve, resolved per frame before the matte is rasterised
+and saved with the mask.
 
 ### 5. Grade controls
 Both the master grade and per-clip grades work, each with ten parameters and a live histogram.
@@ -152,7 +155,11 @@ Size presets and 24/30/60 fps are editable in the session sheet. Missing: arbitr
 
 ## Test coverage now
 
-- `ctest` **24/24**: existing suites plus `ms_effects_screen_test` (a chroma split leaves alpha untouched, a warp keeps fully transparent areas colour-free, zero settings are exact identities, kaleidoscope and VHS are deterministic) and `ms_effects_alpha_test` (a blur conserves coverage, spreads, keeps colour under partial alpha, and is a passthrough at radius 0) and `ms_lut_test` (cube parsing, blend, rejection), `ms_edit_test` (move, trim, ripple, tracks, effect add/param/enable, JSON round-trip, undo, delete, transition add/persist/remove, font resolution, title rasterisation, word wrap, title persistence, keyframe curves) and `ms_proxy_test` (proxy resolution, enable/disable, no-op registration, generation counter).
+- `ctest` **25/25** (the new `ms_loudness_test` checks BS.1770 metering on synthetic tones:
+  a -20 dBFS stereo 1 kHz sine reads -20.69 LUFS within 1.5 LU in all three windows,
+  doubling amplitude adds 6 LU, mono feeds both channels, silence sits at the -70 floor,
+  reset clears the peaks and an integrated reading, and a 44.1 kHz meter reads the same
+  tone): existing suites plus `ms_effects_screen_test` (a chroma split leaves alpha untouched, a warp keeps fully transparent areas colour-free, zero settings are exact identities, kaleidoscope and VHS are deterministic) and `ms_effects_alpha_test` (a blur conserves coverage, spreads, keeps colour under partial alpha, and is a passthrough at radius 0) and `ms_lut_test` (cube parsing, blend, rejection), `ms_edit_test` (move, trim, ripple, tracks, effect add/param/enable, JSON round-trip, undo, delete, transition add/persist/remove, font resolution, title rasterisation, word wrap, title persistence, keyframe curves) and `ms_proxy_test` (proxy resolution, enable/disable, no-op registration, generation counter).
 - `:app:testDebugUnitTest` **6/6**: native JSON contract, timeline end, malformed JSON, aspect ratio, timecode, clip lookup.
 - Android build: `:app:assembleDebug` green, both ABIs, all assets packaged (6 title fonts, 6 looks, 7 UI fonts).
 - `ms_title_demo <dir>` renders four title cards to PPM for visual inspection without a device — this is how the rasteriser was confirmed, not just unit-tested.

@@ -104,6 +104,8 @@ object NativeEngine {
     external fun nativeAudioState(): DoubleArray
     external fun nativeReadAudioPcm(buffer: FloatArray, frames: Int, channels: Int): Boolean
     external fun nativeSetMasterGain(db: Float): Boolean
+    /** Peak L, peak R, momentary, short-term, integrated (LUFS) from the mix. */
+    external fun nativeAudioMeter(out: FloatArray): Boolean
 
     // Master insert chain (0 Gain, 1 EQ, 2 Compressor, 3 Delay, 4 Reverb, 5 Limiter)
     external fun nativeAudioFxCount(): Int
@@ -241,6 +243,47 @@ object NativeEngine {
         track: Int, clip: Int, index: Int, out: FloatArray, invertedOut: IntArray, opOut: IntArray,
     ): Boolean
     external fun nativeClipMaskClear(track: Int, clip: Int): Boolean
+
+    // Mask geometry automation (prop 0 x, 1 y, 2 w, 3 h, 4 feather)
+    external fun nativeMaskKeyframeAdd(
+        track: Int,
+        clip: Int,
+        mask: Int,
+        prop: Int,
+        time: Double,
+        value: Double,
+        interp: Int,
+    ): Boolean
+    external fun nativeMaskKeyframeClear(track: Int, clip: Int, mask: Int, prop: Int): Boolean
+    external fun nativeMaskKeyframeCount(track: Int, clip: Int, mask: Int, prop: Int): Int
+    external fun nativeMaskKeyframeGet(
+        track: Int,
+        clip: Int,
+        mask: Int,
+        prop: Int,
+        key: Int,
+        out: DoubleArray,
+    ): Boolean
+    external fun nativeMaskKeyframeSet(
+        track: Int,
+        clip: Int,
+        mask: Int,
+        prop: Int,
+        key: Int,
+        time: Double,
+        value: Double,
+        interp: Int,
+    ): Boolean
+    external fun nativeMaskKeyframeSample(
+        track: Int,
+        clip: Int,
+        mask: Int,
+        prop: Int,
+        t0: Double,
+        t1: Double,
+        out: FloatArray,
+        bins: Int,
+    ): Boolean
 
     // Per-clip LUT look: a `.cube` graded over one clip, after its grade.
     external fun nativeClipLookSet(track: Int, clip: Int, path: String): Boolean

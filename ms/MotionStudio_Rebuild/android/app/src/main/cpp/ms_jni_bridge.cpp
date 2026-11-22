@@ -200,6 +200,16 @@ Java_com_motionstudio_app_native_NativeEngine_nativeSetMasterGain(JNIEnv*, jobje
 }
 
 // ---- Master audio insert chain -------------------------------------------
+JNIEXPORT jboolean JNICALL
+Java_com_motionstudio_app_native_NativeEngine_nativeAudioMeter(JNIEnv* env, jobject,
+                                                               jfloatArray out) {
+    if (!out || env->GetArrayLength(out) < 5) return JNI_FALSE;
+    float values[5] = {0.f, 0.f, -70.f, -70.f, -70.f};
+    if (ms_audio_meter(values) != 0) return JNI_FALSE;
+    env->SetFloatArrayRegion(out, 0, 5, values);
+    return JNI_TRUE;
+}
+
 JNIEXPORT jint JNICALL
 Java_com_motionstudio_app_native_NativeEngine_nativeAudioFxCount(JNIEnv*, jobject) {
     return ms_audio_fx_count();
@@ -825,6 +835,58 @@ Java_com_motionstudio_app_native_NativeEngine_nativeClipMaskGet(JNIEnv* env, job
     if (ms_clip_mask_get(track, clip, tmp, &inv) != 0) return JNI_FALSE;
     env->SetFloatArrayRegion(out, 0, 6, tmp);
     if (invertedOut && env->GetArrayLength(invertedOut) >= 1) env->SetIntArrayRegion(invertedOut, 0, 1, &inv);
+    return JNI_TRUE;
+}
+
+// ---- Mask geometry automation --------------------------------------------
+JNIEXPORT jboolean JNICALL
+Java_com_motionstudio_app_native_NativeEngine_nativeMaskKeyframeAdd(
+        JNIEnv*, jobject, jint track, jint clip, jint mask, jint prop, jdouble time,
+        jdouble value, jint interp) {
+    return ms_mask_keyframe_add(track, clip, mask, prop, time, value, interp) == 0 ? JNI_TRUE
+                                                                                 : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_motionstudio_app_native_NativeEngine_nativeMaskKeyframeClear(
+        JNIEnv*, jobject, jint track, jint clip, jint mask, jint prop) {
+    return ms_mask_keyframe_clear(track, clip, mask, prop) == 0 ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_motionstudio_app_native_NativeEngine_nativeMaskKeyframeCount(
+        JNIEnv*, jobject, jint track, jint clip, jint mask, jint prop) {
+    return ms_mask_keyframe_count(track, clip, mask, prop);
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_motionstudio_app_native_NativeEngine_nativeMaskKeyframeGet(
+        JNIEnv* env, jobject, jint track, jint clip, jint mask, jint prop, jint key,
+        jdoubleArray out) {
+    if (!out || env->GetArrayLength(out) < 3) return JNI_FALSE;
+    double values[3] = {0.0, 0.0, 0.0};
+    if (ms_mask_keyframe_get(track, clip, mask, prop, key, values) != 0) return JNI_FALSE;
+    env->SetDoubleArrayRegion(out, 0, 3, values);
+    return JNI_TRUE;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_motionstudio_app_native_NativeEngine_nativeMaskKeyframeSet(
+        JNIEnv*, jobject, jint track, jint clip, jint mask, jint prop, jint key, jdouble time,
+        jdouble value, jint interp) {
+    return ms_mask_keyframe_set(track, clip, mask, prop, key, time, value, interp) == 0
+               ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_motionstudio_app_native_NativeEngine_nativeMaskKeyframeSample(
+        JNIEnv* env, jobject, jint track, jint clip, jint mask, jint prop, jdouble t0,
+        jdouble t1, jfloatArray out, jint bins) {
+    if (!out || bins < 2 || env->GetArrayLength(out) < bins) return JNI_FALSE;
+    std::vector<float> tmp(static_cast<size_t>(bins), 0.f);
+    if (ms_mask_keyframe_sample(track, clip, mask, prop, t0, t1, tmp.data(), bins) != 0)
+        return JNI_FALSE;
+    env->SetFloatArrayRegion(out, 0, bins, tmp.data());
     return JNI_TRUE;
 }
 

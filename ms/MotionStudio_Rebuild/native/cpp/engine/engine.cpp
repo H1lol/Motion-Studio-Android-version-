@@ -353,6 +353,17 @@ AudioPlaybackInfo Engine::audio_info() const {
 
 AudioEffectChain& Engine::audio_effects() { return audio_->effects(); }
 
+bool Engine::audio_meter(float* out5) const {
+    if (!out5 || !audio_) return false;
+    const LoudnessMeter::Reading r = audio_->meter().read();
+    out5[0] = r.peak_l;
+    out5[1] = r.peak_r;
+    out5[2] = r.momentary;
+    out5[3] = r.short_term;
+    out5[4] = r.integrated;
+    return true;
+}
+
 void Engine::sync_master_state() {
     if (!project_ || !audio_) return;
     MasterState s;
@@ -511,6 +522,29 @@ const AnimCurve* audio_curve_for(const ClipInfo& c, int prop) {
     switch (prop) {
         case 0: return &c.gain_curve;
         case 1: return &c.pan_curve;
+        default: return nullptr;
+    }
+}
+
+/** Curve slot for a mask geometry property: x, y, w, h, feather. */
+AnimCurve* mask_curve_for(Mask& m, int prop) {
+    switch (prop) {
+        case 0: return &m.x_curve;
+        case 1: return &m.y_curve;
+        case 2: return &m.w_curve;
+        case 3: return &m.h_curve;
+        case 4: return &m.feather_curve;
+        default: return nullptr;
+    }
+}
+
+const AnimCurve* mask_curve_for(const Mask& m, int prop) {
+    switch (prop) {
+        case 0: return &m.x_curve;
+        case 1: return &m.y_curve;
+        case 2: return &m.w_curve;
+        case 3: return &m.h_curve;
+        case 4: return &m.feather_curve;
         default: return nullptr;
     }
 }
@@ -1104,6 +1138,131 @@ bool Engine::clip_mask_at(TrackId track, ClipId clip, int index, float* out6, bo
             }
             if (inverted) *inverted = m.inverted;
             if (op) *op = m.op == MaskOp::Subtract ? 1 : 0;
+            return true;
+        }
+    }
+    return false;
+}
+
+bool Engine::add_mask_keyframe(TrackId track, ClipId clip, int mask, int prop, TimeSec time,
+                               double value, int interp) {
+    if (!project_ || mask < 0 || prop < 0 || prop > 4 || interp < 0 || interp > 5) return false;
+    TrackInfo* t = project_->find_track(track);
+    if (!t) return false;
+    for (auto& c : t->clips) {
+        if (c.id != clip) continue;
+        if (mask >= static_cast<int>(c.masks.size())) return false;
+        AnimCurve* curve = mask_curve_for(c.masks[static_cast<size_t>(mask)], prop);
+        if (!curve) return false;
+        project_->push_undo();
+        const double at = std::max<TimeSec>(0.0, time);
+        const auto& keys = curve->keys();
+        bool replaced = false;
+        for (size_t i = 0; i < keys.size(); ++i) {
+            if (std::fabs(keys[i].time - at) > 1e-6) continue;
+            curve->set_key(i, at, value);
+            curve->set_interp(i, static_cast<CurveInterp>(interp));
+            replaced = true;
+            break;
+        }
+        if (!replaced) curve->add(at, value, static_cast<CurveInterp>(interp));
+        project_->mark_dirty();
+        invalidate_frames();
+        return true;
+    }
+    return false;
+}
+
+bool Engine::clear_mask_keyframes(TrackId track, ClipId clip, int mask, int prop) {
+    if (!project_ || mask < 0 || prop < 0 || prop > 4) return false;
+    TrackInfo* t = project_->find_track(track);
+    if (!t) return false;
+    for (auto& c : t->clips) {
+        if (c.id != clip) continue;
+        if (mask >= static_cast<int>(c.masks.size())) return false;
+        AnimCurve* curve = mask_curve_for(c.masks[static_cast<size_t>(mask)], prop);
+        if (!curve) return false;
+        project_->push_undo();
+        curve->clear();
+        project_->mark_dirty();
+        invalidate_frames();
+        return true;
+    }
+    return false;
+}
+
+int Engine::mask_keyframe_count(TrackId track, ClipId clip, int mask, int prop) const {
+    if (!project_ || mask < 0 || prop < 0 || prop > 4) return 0;
+    for (const auto& t : project_->tracks()) {
+        if (t.id != track) continue;
+        for (const auto& c : t.clips) {
+            if (c.id != clip) continue;
+            if (mask >= static_cast<int>(c.masks.size())) return 0;
+            const AnimCurve* curve = mask_curve_for(c.masks[static_cast<size_t>(mask)], prop);
+            return curve ? static_cast<int>(curve->keys().size()) : 0;
+        }
+    }
+    return 0;
+}
+
+bool Engine::mask_keyframe_at(TrackId track, ClipId clip, int mask, int prop, int key,
+                              double* time, double* value, int* interp) const {
+    if (!project_ || mask < 0 || prop < 0 || prop > 4 || key < 0) return false;
+    for (const auto& t : project_->tracks()) {
+        if (t.id != track) continue;
+        for (const auto& c : t.clips) {
+            if (c.id != clip) continue;
+            if (mask >= static_cast<int>(c.masks.size())) return false;
+            const AnimCurve* curve = mask_curve_for(c.masks[static_cast<size_t>(mask)], prop);
+            if (!curve) return false;
+            const AnimKeyframe* k = curve->at(static_cast<size_t>(key));
+            if (!k) return false;
+            if (time) *time = k->time;
+            if (value) *value = k->value;
+            if (interp) *interp = static_cast<int>(k->interp);
+            return true;
+        }
+    }
+    return false;
+}
+
+bool Engine::set_mask_keyframe(TrackId track, ClipId clip, int mask, int prop, int key,
+                               double time, double value, int interp) {
+    if (!project_ || mask < 0 || prop < 0 || prop > 4 || key < 0 || interp < 0 || interp > 5)
+        return false;
+    TrackInfo* t = project_->find_track(track);
+    if (!t) return false;
+    for (auto& c : t->clips) {
+        if (c.id != clip) continue;
+        if (mask >= static_cast<int>(c.masks.size())) return false;
+        AnimCurve* curve = mask_curve_for(c.masks[static_cast<size_t>(mask)], prop);
+        if (!curve) return false;
+        project_->push_undo();
+        if (!curve->set_key(static_cast<size_t>(key), time, value)) return false;
+        curve->set_interp(static_cast<size_t>(key), static_cast<CurveInterp>(interp));
+        project_->mark_dirty();
+        invalidate_frames();
+        return true;
+    }
+    return false;
+}
+
+bool Engine::sample_mask_param(TrackId track, ClipId clip, int mask, int prop, double t0,
+                               double t1, float* out, int bins) const {
+    if (!project_ || mask < 0 || prop < 0 || prop > 4 || !out || bins < 2) return false;
+    for (const auto& t : project_->tracks()) {
+        if (t.id != track) continue;
+        for (const auto& c : t.clips) {
+            if (c.id != clip) continue;
+            if (mask >= static_cast<int>(c.masks.size())) return false;
+            const AnimCurve* curve = mask_curve_for(c.masks[static_cast<size_t>(mask)], prop);
+            if (!curve) return false;
+            const double span = (t1 > t0) ? (t1 - t0) : 1e-6;
+            for (int i = 0; i < bins; ++i) {
+                const double tt = t0 + span * static_cast<double>(i) /
+                                           static_cast<double>(bins - 1);
+                out[i] = static_cast<float>(curve->eval(tt));
+            }
             return true;
         }
     }

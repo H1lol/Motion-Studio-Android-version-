@@ -4,7 +4,9 @@
  */
 #include "ms_image.hpp"
 #include "ms_error.hpp"
+#include "ms_keyframe.hpp"
 #include "ms_types.hpp"
+#include <algorithm>
 #include <string>
 #include <vector>
 #include <cstdint>
@@ -51,6 +53,30 @@ struct Mask {
   float feather = 0.f; // pixels
   bool inverted = false;
   bool enabled = true;
+  // Geometry automation, in clip-local seconds. Values are the same units as the
+  // static fields (normalized x/y/w/h, feather in pixels). An empty curve leaves
+  // its field in charge, so a mask can animate width alone and still be dragged
+  // by hand when it is not keyed.
+  AnimCurve x_curve, y_curve, w_curve, h_curve, feather_curve;
+
+  bool animated() const {
+    return !x_curve.empty() || !y_curve.empty() || !w_curve.empty() ||
+           !h_curve.empty() || !feather_curve.empty();
+  }
+
+  /** Copy of this mask with every keyed field resolved at `clip_local`. */
+  Mask at(double clip_local) const {
+    Mask m = *this;
+    // Clamp the resolved values: curves interpolate and can overshoot, and a
+    // mask outside the frame would silently vanish or cover everything.
+    if (!x_curve.empty()) m.x = std::min(1.f, std::max(0.f, static_cast<float>(x_curve.eval(clip_local))));
+    if (!y_curve.empty()) m.y = std::min(1.f, std::max(0.f, static_cast<float>(y_curve.eval(clip_local))));
+    if (!w_curve.empty()) m.w = std::min(1.f, std::max(0.01f, static_cast<float>(w_curve.eval(clip_local))));
+    if (!h_curve.empty()) m.h = std::min(1.f, std::max(0.01f, static_cast<float>(h_curve.eval(clip_local))));
+    if (!feather_curve.empty())
+      m.feather = std::max(0.f, static_cast<float>(feather_curve.eval(clip_local)));
+    return m;
+  }
 };
 
 /** 0 rect, 1 ellipse, anything else full frame. */

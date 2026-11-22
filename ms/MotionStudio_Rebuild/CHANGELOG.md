@@ -1,5 +1,37 @@
 # Changelog
 
+## Unreleased — mask geometry automation
+
+### Added
+- **Keyed masks.** Each mask can animate any of its five geometry values — centre X,
+  centre Y, width, height and feather — on its own clip-local curve, so a matte can grow
+  over a face, drift across the frame or soften as a shot ends. Un-keyed fields keep their
+  static values and sliders, so keying width alone does not freeze the mask's position
+- **Resolved per frame.** The clip renderer checks whether any mask on the clip is
+  animated, resolves the keyed fields at the frame's clip-local time and rasterises the
+  matte from that copy. An un-animated mask rasterises its stored struct exactly as
+  before, and the resolved values are clamped to the frame so an interpolating curve
+  cannot push a mask out of view
+- **Engine surface.** `add_mask_keyframe`, `clear_mask_keyframes`,
+  `mask_keyframe_count/at/set` and `sample_mask_param`, with the same
+  replace-on-the-same-instant rule as the other curves. Bridged as `ms_mask_keyframe_*`
+  and surfaced in `MASK` as ◆ chips per value that show their key count and clear when
+  tapped
+- **Persistence.** `keys_x`, `keys_y`, `keys_w`, `keys_h` and `keys_feather` are written
+  only when a mask is keyed, so an un-animated mask keeps the record older builds wrote
+
+### Verified
+- `ms_edit_test`: a mask key round-trips, a same-instant key replaces, the width curve
+  interpolates 0.2 → 0.4 → 0.6 across half a second while an un-keyed field stays put,
+  the curve samples agree, the curves survive a save/load round trip, clearing empties
+  only that curve, and a bad mask index or property is rejected
+- `bridge/ms_bridge.cpp` compiles clean under `-fsyntax-only`. Kotlin/JNI and Compose were
+  not compiled here (no Android toolchain in this environment)
+
+### Provenance
+- Original work: the project's own `AnimCurve` and matte rasteriser, no third-party roto
+  or tracking code
+
 ## Unreleased — title reveal presets
 
 ### Added

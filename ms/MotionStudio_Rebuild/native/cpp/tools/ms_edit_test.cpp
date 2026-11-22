@@ -605,6 +605,52 @@ int main() {
         check(e.add_audio_keyframe(track, clip, 2, 0.0, 0.0) == false, "bad audio prop rejected");
     }
 
+    // Mask geometry automation: a keyed field resolves per frame, un-keyed fields
+    // stay put, and the curves travel with the document.
+    {
+        const ms::ClipId mc = e.add_clip(track, 1, 10.0, 2.0);
+        check(mc != 0, "mask clip added");
+        check(e.add_clip_mask(track, mc, 0, 0.2f, 0.2f, 0.4f, 0.4f, 0.f, false, 0) == 1,
+              "mask added for automation");
+        check(e.add_mask_keyframe(track, mc, 0, 2, 0.0, 0.2), "mask w key 0");
+        check(e.add_mask_keyframe(track, mc, 0, 2, 1.0, 0.8), "mask w key 1");
+        check(e.add_mask_keyframe(track, mc, 0, 2, 1.0, 0.6), "mask w key replaced");
+        check(e.mask_keyframe_count(track, mc, 0, 2) == 2, "mask w keys counted");
+        double kt = -1.0, kv = -1.0;
+        int ki = -1;
+        check(e.mask_keyframe_at(track, mc, 0, 2, 1, &kt, &kv, &ki) &&
+                  std::fabs(kv - 0.6) < 1e-6,
+              "mask key replacement value");
+
+        const ms::ClipInfo* mci = e.project().find_clip(track, mc);
+        check(mci && !mci->masks.empty() && mci->masks[0].animated(),
+              "mask reports animated");
+        if (mci && !mci->masks.empty()) {
+            const ms::Mask a = mci->masks[0].at(0.0);
+            const ms::Mask b = mci->masks[0].at(0.5);
+            const ms::Mask c = mci->masks[0].at(1.0);
+            check(std::fabs(a.w - 0.2f) < 1e-4f && std::fabs(b.w - 0.4f) < 1e-4f &&
+                      std::fabs(c.w - 0.6f) < 1e-4f,
+                  "mask width curve interpolates");
+            check(std::fabs(a.x - 0.2f) < 1e-4f && std::fabs(c.x - 0.2f) < 1e-4f,
+                  "un-keyed mask fields keep their value");
+        }
+
+        float bins3[3] = {};
+        check(e.sample_mask_param(track, mc, 0, 2, 0.0, 1.0, bins3, 3), "mask curve sampled");
+        check(std::fabs(bins3[0] - 0.2f) < 1e-4f && std::fabs(bins3[2] - 0.6f) < 1e-4f,
+              "mask curve sample ends");
+
+        const std::string mj2 = e.project_to_json();
+        check(mj2.find("\"keys_w\"") != std::string::npos, "mask curve serialized");
+        check(e.load_project_json(mj2), "reload with mask automation");
+        check(e.mask_keyframe_count(track, mc, 0, 2) == 2, "mask curve restored");
+        check(e.clear_mask_keyframes(track, mc, 0, 2), "mask curve cleared");
+        check(e.mask_keyframe_count(track, mc, 0, 2) == 0, "mask curve empty after clear");
+        check(!e.add_mask_keyframe(track, mc, 9, 0, 0.0, 0.5), "bad mask index rejected");
+        check(!e.add_mask_keyframe(track, mc, 0, 5, 0.0, 0.5), "bad mask prop rejected");
+    }
+
     // Keyframe curves: read-back, interpolation modes and a save/load round trip.
     {
         check(e.add_keyframe(track, clip, 0, 0.0, 0.0), "curve: key 0 added");

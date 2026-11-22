@@ -245,6 +245,9 @@ Error TimelineAudioPlayback::prepare() {
   if (!session_) return Error::make(ErrorCode::NotInitialized, "no session");
   fps_ = session_->meta().fps > 1 ? session_->meta().fps : 24.f;
   decoders_.clear();
+  // The mix runs at a fixed 48 kHz here; tell the meter so its K-weighting is
+  // computed for the rate the samples actually arrive at.
+  meter_.set_sample_rate(48000);
   return Error::success();
 }
 
@@ -260,10 +263,14 @@ void TimelineAudioPlayback::pause() { playing_ = false; }
 void TimelineAudioPlayback::stop() {
   playing_ = false;
   time_ = 0;
+  meter_.reset();
 }
 
 Error TimelineAudioPlayback::seek(TimeSec t) {
   time_ = std::max(0.0, t);
+  // A new position starts a new measurement; carrying an integrated reading
+  // across a seek would report the loudness of two unrelated sections.
+  meter_.reset();
   return Error::success();
 }
 
@@ -408,7 +415,10 @@ Error TimelineAudioPlayback::read_pcm(float* interleaved, int frames, int channe
   // device/output stage is responsible for final conversion/limiting.
   for (int i = 0; i < frames * ch; ++i)
     interleaved[i] = std::clamp(interleaved[i], -1.f, 1.f);
-  return effects_.process(interleaved, static_cast<std::size_t>(frames), rate, ch);
+  Error mixed = effects_.process(interleaved, static_cast<std::size_t>(frames), rate, ch);
+  // Meter what the listener actually hears: post-fader, post-insert.
+  if (mixed.ok()) meter_.process(interleaved, static_cast<std::size_t>(frames), ch);
+  return mixed;
 }
 
 Error TimelineAudioPlayback::clip_peaks(const ClipInfo& clip, int bins, std::vector<float>& out) {

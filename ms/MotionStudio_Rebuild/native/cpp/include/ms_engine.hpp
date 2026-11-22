@@ -58,6 +58,12 @@ public:
     Error read_audio(float* interleaved, int frames, int channels = 2);
     AudioPlaybackInfo audio_info() const;
     AudioEffectChain& audio_effects();
+    /**
+     * Fills 5 floats from the mix loudness meter: peak left, peak right (linear),
+     * momentary LUFS (400 ms), short-term LUFS (3 s) and integrated LUFS. The
+     * reading is BS.1770 K-weighted and gated, not a plain RMS.
+     */
+    bool audio_meter(float* out5) const;
 
     // ---- Document-persisted master state ----------------------------------
     // The master grade and the master audio insert chain are engine state, but
@@ -252,6 +258,22 @@ public:
     /** Fills 6 floats plus the invert flag and the op of mask `index`. */
     bool clip_mask_at(TrackId track, ClipId clip, int index, float* out6, bool* inverted,
                       int* op) const;
+
+    // ---- Mask geometry automation -----------------------------------------
+    // prop: 0 x, 1 y, 2 w, 3 h, 4 feather. Times are clip-local seconds. A keyed
+    // field is resolved per frame before the matte is rasterised; un-keyed fields
+    // keep their static values, so the sliders still work.
+    bool add_mask_keyframe(TrackId track, ClipId clip, int mask, int prop, TimeSec time,
+                           double value, int interp = 0);
+    bool clear_mask_keyframes(TrackId track, ClipId clip, int mask, int prop);
+    int  mask_keyframe_count(TrackId track, ClipId clip, int mask, int prop) const;
+    bool mask_keyframe_at(TrackId track, ClipId clip, int mask, int prop, int key,
+                          double* time, double* value, int* interp) const;
+    bool set_mask_keyframe(TrackId track, ClipId clip, int mask, int prop, int key,
+                           double time, double value, int interp);
+    /** Fills `bins` samples of one mask curve over [t0, t1] (clip-local). */
+    bool sample_mask_param(TrackId track, ClipId clip, int mask, int prop, double t0,
+                           double t1, float* out, int bins) const;
 
     // ---- Per-clip LUT look -------------------------------------------------
     // A `.cube` graded over this clip only, after its grade and before its

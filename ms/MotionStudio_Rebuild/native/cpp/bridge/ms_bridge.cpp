@@ -264,6 +264,9 @@ MSAudioState ms_audio_state() {
 int ms_audio_read_pcm(float* interleaved, int frames, int channels) {
     return ms::Engine::instance().read_audio(interleaved, frames, channels).ok() ? 0 : -1;
 }
+int ms_audio_meter(float* out5) {
+    return ms::Engine::instance().audio_meter(out5) ? 0 : -1;
+}
 int ms_look_load(const char* path) {
     return (path && ms::Engine::instance().load_look(path)) ? 0 : -1;
 }
@@ -406,6 +409,47 @@ int ms_clip_mask_get(int track_id, int clip_id, float* out6, int* inverted) {
     const bool ok = ms::Engine::instance().clip_mask(track_id, clip_id, out6, &inv);
     if (inverted) *inverted = inv ? 1 : 0;
     return ok ? 0 : -1;
+}
+
+int ms_mask_keyframe_add(int track_id, int clip_id, int mask, int prop, double time,
+                         double value, int interp) {
+    return ms::Engine::instance().add_mask_keyframe(track_id, clip_id, mask, prop, time, value,
+                                                     interp) ? 0 : -1;
+}
+
+int ms_mask_keyframe_clear(int track_id, int clip_id, int mask, int prop) {
+    return ms::Engine::instance().clear_mask_keyframes(track_id, clip_id, mask, prop) ? 0 : -1;
+}
+
+int ms_mask_keyframe_count(int track_id, int clip_id, int mask, int prop) {
+    return ms::Engine::instance().mask_keyframe_count(track_id, clip_id, mask, prop);
+}
+
+int ms_mask_keyframe_get(int track_id, int clip_id, int mask, int prop, int key,
+                         double* out3) {
+    if (!out3) return -1;
+    double time = 0.0, value = 0.0;
+    int interp = 0;
+    if (!ms::Engine::instance().mask_keyframe_at(track_id, clip_id, mask, prop, key, &time,
+                                                 &value, &interp))
+        return -1;
+    out3[0] = time;
+    out3[1] = value;
+    out3[2] = static_cast<double>(interp);
+    return 0;
+}
+
+int ms_mask_keyframe_set(int track_id, int clip_id, int mask, int prop, int key, double time,
+                         double value, int interp) {
+    return ms::Engine::instance().set_mask_keyframe(track_id, clip_id, mask, prop, key, time,
+                                                    value, interp) ? 0 : -1;
+}
+
+int ms_mask_keyframe_sample(int track_id, int clip_id, int mask, int prop, double t0,
+                            double t1, float* out, int bins) {
+    if (!out) return -1;
+    return ms::Engine::instance().sample_mask_param(track_id, clip_id, mask, prop, t0, t1, out,
+                                                    bins) ? 0 : -1;
 }
 
 int ms_clip_grade_set(int track_id, int clip_id, float exposure, float contrast,

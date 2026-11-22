@@ -74,6 +74,8 @@ typedef struct {
 
 MSAudioState ms_audio_state();
 int ms_audio_read_pcm(float* interleaved, int frames, int channels);
+/** Mix loudness meter: peak L, peak R, momentary, short-term, integrated (LUFS). */
+int ms_audio_meter(float* out5);
 // Sets the master gain stage of the timeline insert chain (dB, 0 = unity).
 int ms_audio_set_master_gain(float gain_db);
 
@@ -207,6 +209,20 @@ int ms_clip_mask_set(int track_id, int clip_id, int shape, float x, float y, flo
 int ms_clip_mask_clear(int track_id, int clip_id);
 /** Writes shape/x/y/w/h/feather to out6 and the invert flag to inverted. */
 int ms_clip_mask_get(int track_id, int clip_id, float* out6, int* inverted);
+
+// ---- Mask geometry automation -------------------------------------------
+// prop: 0 x, 1 y, 2 w, 3 h, 4 feather. Times are clip-local seconds; the
+// renderer resolves keyed fields per frame before rasterising the matte.
+int ms_mask_keyframe_add(int track_id, int clip_id, int mask, int prop, double time,
+                         double value, int interp);
+int ms_mask_keyframe_clear(int track_id, int clip_id, int mask, int prop);
+int ms_mask_keyframe_count(int track_id, int clip_id, int mask, int prop);
+/** Fills out3 with time, value and interpolation. */
+int ms_mask_keyframe_get(int track_id, int clip_id, int mask, int prop, int key, double* out3);
+int ms_mask_keyframe_set(int track_id, int clip_id, int mask, int prop, int key, double time,
+                         double value, int interp);
+int ms_mask_keyframe_sample(int track_id, int clip_id, int mask, int prop, double t0,
+                            double t1, float* out, int bins);
 
 // Multi-mask: a clip can carry several shape masks. op is 0 add (union) or 1
 // subtract (cut out of the union). At most 8 per clip.

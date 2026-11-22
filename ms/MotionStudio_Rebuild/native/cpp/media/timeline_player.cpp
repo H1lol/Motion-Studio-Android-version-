@@ -259,7 +259,21 @@ void TimelinePlayer::render_clip_into(const ClipInfo& clip, TimeSec time, int W,
   // buffer per clip per frame for a multiplication of one channel.
   if (clip.mask_enabled && !clip.masks.empty()) {
     ImageBuffer& mask_img = scratch_[4];
-    if (rasterize_masks(clip.masks, W, H, mask_img).ok() && mask_img.valid())
+    // Keyed geometry is resolved once per frame; an un-keyed clip rasterises its
+    // stored masks directly and pays nothing for the animation support.
+    bool animated = false;
+    for (const auto& m : clip.masks) {
+      if (!m.animated()) continue;
+      animated = true;
+      break;
+    }
+    std::vector<Mask> evaluated;
+    if (animated) {
+      evaluated.reserve(clip.masks.size());
+      for (const auto& m : clip.masks) evaluated.push_back(m.at(local));
+    }
+    if (rasterize_masks(animated ? evaluated : clip.masks, W, H, mask_img).ok() &&
+        mask_img.valid())
       apply_mask_inplace(frame, mask_img, MaskMode::Alpha);
   }
 

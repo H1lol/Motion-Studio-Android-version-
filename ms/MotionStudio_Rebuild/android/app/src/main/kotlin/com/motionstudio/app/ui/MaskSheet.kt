@@ -158,6 +158,32 @@ fun MaskSheet(engine: EditorEngine, onDismiss: () -> Unit) {
                 MaskSlider("Height", h, 0.02f, 1f) { h = it; push() }
                 MaskSlider("Feather (px)", feather, 0f, 200f) { feather = it; push() }
 
+                // ◆ keys the current value at the playhead; a keyed chip shows
+                // its key count and clears that curve when tapped.
+                var keyRevision by remember { mutableIntStateOf(0) }
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    listOf(
+                        Triple("X", 0, x),
+                        Triple("Y", 1, y),
+                        Triple("W", 2, w),
+                        Triple("H", 3, h),
+                        Triple("F", 4, feather),
+                    ).forEach { (label, prop, value) ->
+                        val count = remember(keyRevision, index, prop) {
+                            engine.maskKeyframeCount(index, prop)
+                        }
+                        MaskChip(
+                            label = if (count > 0) "$label $count ✕" else "◆ $label",
+                            selected = count > 0,
+                            onClick = {
+                                if (count > 0) engine.clearMaskKeyframes(index, prop)
+                                else engine.addMaskKeyframe(index, prop, value)
+                                keyRevision++
+                            },
+                        )
+                    }
+                }
+
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         "Invert this mask",

@@ -361,7 +361,28 @@ std::string ProjectSession::to_json() const {
            << ", \"w\": " << mm.w << ", \"h\": " << mm.h
            << ", \"feather\": " << mm.feather
            << ", \"inv\": " << (mm.inverted ? "true" : "false")
-           << ", \"on\": " << (mm.enabled ? "true" : "false") << "}";
+           << ", \"on\": " << (mm.enabled ? "true" : "false");
+        // Mask geometry curves, written only when keyed so an un-animated mask
+        // keeps the exact record older builds wrote.
+        auto mask_curve = [&](const char* name, const AnimCurve& curve, bool last) {
+          if (curve.empty()) {
+            if (last) ss << "}";
+            return;
+          }
+          ss << ", \"" << name << "\": [";
+          const auto& ks = curve.keys();
+          for (size_t ki = 0; ki < ks.size(); ++ki) {
+            ss << "[" << ks[ki].time << ", " << ks[ki].value << ", "
+               << static_cast<int>(ks[ki].interp) << "]";
+            if (ki + 1 < ks.size()) ss << ", ";
+          }
+          ss << "]" << (last ? "}" : "");
+        };
+        mask_curve("keys_x", mm.x_curve, false);
+        mask_curve("keys_y", mm.y_curve, false);
+        mask_curve("keys_w", mm.w_curve, false);
+        mask_curve("keys_h", mm.h_curve, false);
+        mask_curve("keys_feather", mm.feather_curve, true);
       }
       ss << "]"
          << ", \"look_path\": \"" << esc(c.look_path) << "\""
@@ -568,6 +589,11 @@ Error ProjectSession::load_from_json(const std::string& json) {
           mm.feather = static_cast<float>(extract_number(mo, "feather", 0));
           mm.inverted = mo.find("\"inv\": true") != std::string::npos;
           mm.enabled = mo.find("\"on\": false") == std::string::npos;
+          parse_motion_curve(mo, "keys_x", mm.x_curve);
+          parse_motion_curve(mo, "keys_y", mm.y_curve);
+          parse_motion_curve(mo, "keys_w", mm.w_curve);
+          parse_motion_curve(mo, "keys_h", mm.h_curve);
+          parse_motion_curve(mo, "keys_feather", mm.feather_curve);
           mm.id = c.masks.size() + 1;
           mm.name = "Mask " + std::to_string(c.masks.size() + 1);
           c.masks.push_back(mm);

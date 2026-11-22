@@ -22,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -113,6 +114,15 @@ fun AudioSheet(engine: EditorEngine, onDismiss: () -> Unit) {
     // not pull the handle back under the finger.
     val drafts = remember(revision) { mutableStateMapOf<String, Float>() }
     val tracks = engine.doc.tracks
+    // The meter is filled by the audio thread; poll it while the sheet is open.
+    // Reading is a handful of atomics, so 120 ms costs nothing.
+    var meter by remember { mutableStateOf(FloatArray(5).apply { this[2] = -70f; this[3] = -70f; this[4] = -70f }) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            engine.audioMeter()?.let { meter = it }
+            kotlinx.coroutines.delay(120)
+        }
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -128,6 +138,8 @@ fun AudioSheet(engine: EditorEngine, onDismiss: () -> Unit) {
                 fontSize = 12.sp,
             )
             Spacer(Modifier.height(10.dp))
+            MixMeter(meter)
+            Spacer(Modifier.height(8.dp))
 
             LazyColumn(Modifier.fillMaxWidth().height(430.dp)) {
                 item { SectionLabel("MASTER CHAIN") }
@@ -222,6 +234,53 @@ fun AudioSheet(engine: EditorEngine, onDismiss: () -> Unit) {
             }
             Spacer(Modifier.height(20.dp))
         }
+    }
+}
+
+/** Peak bar plus the three BS.1770 loudness windows for the final mix. */
+@Composable
+private fun MixMeter(meter: FloatArray) {
+    val peak = maxOf(meter[0], meter[1])
+    Column(Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "PEAK",
+                color = MsColors.textMuted,
+                fontSize = 9.sp,
+                fontFamily = MsFonts.mono,
+                modifier = Modifier.width(40.dp),
+            )
+            Box(
+                Modifier
+                    .weight(1f)
+                    .height(6.dp)
+                    .background(MsColors.surfaceHigh, RoundedCornerShape(1.dp))
+            ) {
+                Box(
+                    Modifier
+                        .fillMaxWidth(peak.coerceIn(0f, 1f))
+                        .height(6.dp)
+                        .background(
+                            if (peak >= 0.98f) MsColors.error else MsColors.accentSoft,
+                            RoundedCornerShape(1.dp),
+                        )
+                )
+            }
+            Text(
+                if (peak <= 0.00001f) "-inf" else "%.1f dB".format(20.0 * log10(peak.toDouble())),
+                color = MsColors.textTertiary,
+                fontSize = 9.sp,
+                fontFamily = MsFonts.mono,
+                modifier = Modifier.padding(start = 6.dp).width(58.dp),
+            )
+        }
+        Text(
+            "LUFS  M %+.1f · S %+.1f · I %+.1f".format(meter[2], meter[3], meter[4]),
+            color = MsColors.textTertiary,
+            fontSize = 9.sp,
+            fontFamily = MsFonts.mono,
+            modifier = Modifier.padding(start = 40.dp, top = 2.dp),
+        )
     }
 }
 

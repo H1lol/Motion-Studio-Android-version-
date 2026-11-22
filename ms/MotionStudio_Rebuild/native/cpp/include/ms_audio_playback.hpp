@@ -7,6 +7,7 @@
  */
 #include "ms_media.hpp"
 #include "ms_audio_fx.hpp"
+#include "ms_loudness.hpp"
 #include "ms_ffmpeg_io.hpp"
 #include "ms_error.hpp"
 #include "ms_types.hpp"
@@ -136,6 +137,9 @@ public:
   AudioPlaybackInfo info() const;
   AudioEffectChain& effects() { return effects_; }
   const AudioEffectChain& effects() const { return effects_; }
+  /** Meter of the final mix (after the master chain), polled by the UI. */
+  LoudnessMeter& meter() { return meter_; }
+  const LoudnessMeter& meter() const { return meter_; }
 
 private:
   /**
@@ -158,6 +162,7 @@ private:
   // Scratch mix for a track with inserts, reused between blocks.
   std::vector<float> track_scratch_;
   AudioEffectChain effects_;
+  LoudnessMeter meter_;
 };
 
 } // namespace ms

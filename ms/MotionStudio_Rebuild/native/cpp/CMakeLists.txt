@@ -42,6 +42,7 @@ set(MS_CORE_SOURCES
   media/audio_mixer.cpp
   media/audio_fx.cpp
   media/audio_playback.cpp
+  media/loudness.cpp
   color/color_pipeline.cpp
   color/lut.cpp
   color/scopes.cpp
@@ -187,6 +188,9 @@ target_link_libraries(ms_effects_motion_test PRIVATE ms_core)
 add_executable(ms_effects_looks_test tools/ms_effects_looks_test.cpp)
 target_link_libraries(ms_effects_looks_test PRIVATE ms_core)
 
+add_executable(ms_loudness_test tools/ms_loudness_test.cpp)
+target_link_libraries(ms_loudness_test PRIVATE ms_core)
+
 add_executable(ms_engine_audio_test tools/ms_engine_audio_test.cpp)
 target_link_libraries(ms_engine_audio_test PRIVATE motionstudio_native)
 
@@ -223,6 +227,7 @@ add_test(NAME ms_effects_alpha_test COMMAND ms_effects_alpha_test)
 add_test(NAME ms_effects_screen_test COMMAND ms_effects_screen_test)
 add_test(NAME ms_effects_motion_test COMMAND ms_effects_motion_test)
 add_test(NAME ms_effects_looks_test COMMAND ms_effects_looks_test)
+add_test(NAME ms_loudness_test COMMAND ms_loudness_test)
 set_tests_properties(
   ms_studio_test ms_pass345_deep ms_pass6_test ms_11_16_test ms_17_22_test
   ms_23_30_test ms_audio_fx_test ms_audio_playback_test ms_graph_safety_test ms_export_profile_test

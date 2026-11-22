@@ -921,6 +921,40 @@ class EditorEngine(
         return true
     }
 
+    // ---- Mask geometry automation ------------------------------------------
+
+    /** Keys on one mask curve: prop 0 x, 1 y, 2 w, 3 h, 4 feather. */
+    fun maskKeyframeCount(mask: Int, prop: Int): Int {
+        val (t, c) = selection() ?: return 0
+        return NativeEngine.nativeMaskKeyframeCount(t, c, mask, prop)
+    }
+
+    fun addMaskKeyframe(mask: Int, prop: Int, value: Float): Boolean {
+        val (t, c) = selection() ?: run {
+            status = "Select a clip first"
+            return false
+        }
+        val clip = doc.clipById(t, c) ?: return false
+        val local = time - clip.start
+        if (local < 0.0) {
+            status = "Playhead is before the clip"
+            return false
+        }
+        if (!NativeEngine.nativeMaskKeyframeAdd(t, c, mask, prop, local, value.toDouble(), 0))
+            return false
+        markDirty()
+        status = "Mask key added"
+        return true
+    }
+
+    fun clearMaskKeyframes(mask: Int, prop: Int): Boolean {
+        val (t, c) = selection() ?: return false
+        if (!NativeEngine.nativeMaskKeyframeClear(t, c, mask, prop)) return false
+        markDirty()
+        status = "Mask curve cleared"
+        return true
+    }
+
     // ---- Retime + adjustment layers ---------------------------------------
 
     /** Play speed of the selected clip, as the native document reports it. */
@@ -1558,6 +1592,12 @@ class EditorEngine(
     /** Bumped on every insert edit so an open sheet re-reads the chain. */
     var audioRevision by mutableIntStateOf(0)
         private set
+
+    /** BS.1770 meter of the timeline mix: peak L/R, momentary, short, integrated. */
+    fun audioMeter(): FloatArray? {
+        val out = FloatArray(5)
+        return if (NativeEngine.nativeAudioMeter(out)) out else null
+    }
 
     fun audioInserts(): List<AudioInsert> {
         val count = NativeEngine.nativeAudioFxCount()
