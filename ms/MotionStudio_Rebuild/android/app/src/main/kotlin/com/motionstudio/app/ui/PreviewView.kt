@@ -78,6 +78,9 @@ class PreviewView(context: Context) : View(context) {
     private val src = Rect()
     private val dst = RectF()
 
+    /** Reused across frames: onDraw must not allocate, or it allocates at 60 Hz. */
+    private val guideRect = RectF()
+
     private var scale = 1f
     private var offsetX = 0f
     private var offsetY = 0f
@@ -233,7 +236,7 @@ class PreviewView(context: Context) : View(context) {
             guideH *= scale
             val guideLeft = (width - guideW) / 2f + offsetX
             val guideTop = (height - guideH) / 2f + offsetY
-            val guide = RectF(guideLeft, guideTop, guideLeft + guideW, guideTop + guideH)
+            val guide = guideRect.also { it.set(guideLeft, guideTop, guideLeft + guideW, guideTop + guideH) }
 
             // 2. The composite, contained inside the guide (never cropped by it).
             val frameAspect = bitmap.width.toFloat() / bitmap.height.toFloat()
@@ -280,10 +283,22 @@ class PreviewView(context: Context) : View(context) {
                     invalidate()
                 }
             }
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+            MotionEvent.ACTION_UP -> {
+                parent?.requestDisallowInterceptTouchEvent(false)
+                // The view handles its own touches, so it must answer the
+                // accessibility click action too; a screen reader's "activate"
+                // otherwise does nothing at all here.
+                performClick()
+            }
+            MotionEvent.ACTION_CANCEL -> {
                 parent?.requestDisallowInterceptTouchEvent(false)
             }
         }
+        return true
+    }
+
+    override fun performClick(): Boolean {
+        super.performClick()
         return true
     }
 

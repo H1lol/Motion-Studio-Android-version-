@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -83,21 +84,14 @@ fun MoreSheet(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp, vertical = 4.dp)
         ) {
-            Text(
+            SheetHeader(
                 "Session",
-                color = MsColors.textPrimary,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
                 "${engine.doc.width} × ${engine.doc.height} · " +
                     "${ExportSettings.formatFps(engine.fps)} fps · " +
                     "${engine.doc.media.size} media · ${engine.doc.tracks.sumOf { it.clips.size }} clips",
-                color = MsColors.textTertiary,
-                fontSize = 12.sp,
+                onDismiss = onDismiss,
             )
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(6.dp))
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton(onClick = { engine.splitAtPlayhead() }) { Text("Split clip") }
@@ -115,7 +109,7 @@ fun MoreSheet(
             )
 
             Spacer(Modifier.height(6.dp))
-            SectionLabel("CANVAS RATIO")
+            SheetSection("CANVAS RATIO")
             Row(
                 Modifier.horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -136,7 +130,7 @@ fun MoreSheet(
             )
 
             Spacer(Modifier.height(10.dp))
-            SectionLabel("PROJECT FRAME RATE")
+            SheetSection("PROJECT FRAME RATE")
             Row(
                 Modifier.horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -174,7 +168,7 @@ fun MoreSheet(
             }
 
             Spacer(Modifier.height(10.dp))
-            SectionLabel("PREVIEW RATIO")
+            SheetSection("PREVIEW RATIO")
             Row(
                 Modifier.horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -192,7 +186,7 @@ fun MoreSheet(
             )
 
             Spacer(Modifier.height(10.dp))
-            SectionLabel("IMPORT PLACEMENT")
+            SheetSection("IMPORT PLACEMENT")
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 SessionChip("At playhead", !engine.appendImportsAtEnd) {
                     engine.appendImportsAtEnd = false
@@ -203,7 +197,7 @@ fun MoreSheet(
             }
 
             Spacer(Modifier.height(10.dp))
-            SectionLabel("MARKERS")
+            SheetSection("MARKERS")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton(onClick = { engine.addMarker() }) {
                     Text("Add at playhead (${engine.time.toInt()}s)", fontSize = 12.sp)
@@ -224,7 +218,7 @@ fun MoreSheet(
             }
 
             Spacer(Modifier.height(10.dp))
-            SectionLabel("PROXY MEDIA")
+            SheetSection("PROXY MEDIA")
             val proxyFiles = remember(proxyRevision) { ProxyStore.count() }
             val proxyBytes = remember(proxyRevision) { ProxyStore.totalBytes() }
             Text(
@@ -351,15 +345,6 @@ fun MoreSheet(
     }
 }
 
-@Composable
-private fun SectionLabel(text: String) {
-    Text(
-        text,
-        color = MsColors.textTertiary,
-        fontSize = 10.sp,
-        letterSpacing = 1.sp,
-    )
-}
 
 @Composable
 private fun SessionChip(label: String, selected: Boolean, onClick: () -> Unit) {
@@ -368,14 +353,15 @@ private fun SessionChip(label: String, selected: Boolean, onClick: () -> Unit) {
         color = if (selected) MsColors.accentSoft else MsColors.textSecondary,
         fontSize = 11.sp,
         modifier = Modifier
-            .background(MsColors.surfaceHigh, RoundedCornerShape(3.dp))
+            .heightIn(min = 32.dp)
+            .background(MsColors.surfaceHigh, RoundedCornerShape(5.dp))
             .border(
                 1.dp,
                 if (selected) MsColors.accentSoft else MsColors.border,
-                RoundedCornerShape(3.dp),
+                RoundedCornerShape(5.dp),
             )
             .clickable(onClick = onClick)
-            .padding(horizontal = 9.dp, vertical = 5.dp),
+            .padding(horizontal = 11.dp, vertical = 7.dp),
     )
 }
 

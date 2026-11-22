@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -48,8 +49,8 @@ import com.motionstudio.app.editor.Knob
 import com.motionstudio.app.ui.theme.MsColors
 import com.motionstudio.app.ui.theme.MsFonts
 
-private val NodeWidth = 132.dp
-private val NodeHeight = 56.dp
+private val NodeWidth = 148.dp
+private val NodeHeight = 62.dp
 private val CanvasWidth = 1400.dp
 private val CanvasHeight = 760.dp
 
@@ -83,25 +84,26 @@ fun NodeGraphPane(engine: EditorEngine, modifier: Modifier = Modifier) {
 
         // ---- toolbar --------------------------------------------------------
         Row(
-            Modifier.fillMaxWidth().height(34.dp).background(MsColors.surface)
+            Modifier.fillMaxWidth().height(40.dp).background(MsColors.surface)
                 .horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(5.dp),
         ) {
             Box(
                 Modifier
+                    .heightIn(min = 30.dp)
                     .border(
                         1.dp,
                         if (engine.compActive) MsColors.accent else MsColors.border,
-                        RoundedCornerShape(2.dp),
+                        RoundedCornerShape(3.dp),
                     )
                     .clickable { engine.activateComp(!engine.compActive) }
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
             ) {
                 Text(
                     if (engine.compActive) "COMP ON" else "COMP OFF",
                     color = if (engine.compActive) MsColors.accent else MsColors.textTertiary,
-                    fontSize = 9.sp,
+                    fontSize = 10.sp,
                     fontFamily = MsFonts.mono,
                     fontWeight = FontWeight.Bold,
                 )
@@ -119,19 +121,20 @@ fun NodeGraphPane(engine: EditorEngine, modifier: Modifier = Modifier) {
             ).forEach { (op, label) ->
                 Box(
                     Modifier
-                        .border(1.dp, MsColors.border, RoundedCornerShape(2.dp))
+                        .heightIn(min = 30.dp)
+                        .border(1.dp, MsColors.border, RoundedCornerShape(3.dp))
                         .clickable {
                             // New nodes land in a free column so they never stack.
                             val x = 40f + (nodes.size % 4) * 170f
                             val y = 60f + (nodes.size / 4) * 110f
                             selected = engine.addCompNode(op, x, y)
                         }
-                        .padding(horizontal = 7.dp, vertical = 4.dp)
+                        .padding(horizontal = 9.dp, vertical = 6.dp)
                 ) {
                     Text(
                         label,
                         color = MsColors.textSecondary,
-                        fontSize = 9.sp,
+                        fontSize = 10.sp,
                         fontFamily = MsFonts.mono,
                     )
                 }
@@ -192,16 +195,16 @@ fun NodeGraphPane(engine: EditorEngine, modifier: Modifier = Modifier) {
         Column(
             Modifier
                 .fillMaxWidth()
-                .height(150.dp)
+                .weight(0.55f)
                 .background(MsColors.surface)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 12.dp, vertical = 6.dp)
+                .padding(horizontal = 12.dp, vertical = 8.dp)
         ) {
             if (selectedNode == null) {
                 Text(
                     "No node selected. Add one above, then tap a node's IN port to wire the selected node into it.",
                     color = MsColors.textTertiary,
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                 )
                 return@Column
             }
@@ -209,7 +212,7 @@ fun NodeGraphPane(engine: EditorEngine, modifier: Modifier = Modifier) {
                 Text(
                     "#${selectedNode.id}  ${CompOps.name(selectedNode.op).uppercase()}",
                     color = MsColors.textPrimary,
-                    fontSize = 12.sp,
+                    fontSize = 13.sp,
                     fontFamily = MsFonts.mono,
                     fontWeight = FontWeight.Bold,
                 )
@@ -217,7 +220,7 @@ fun NodeGraphPane(engine: EditorEngine, modifier: Modifier = Modifier) {
                 Text(
                     if (selectedNode.enabled) "ACTIVE" else "BYPASSED",
                     color = if (selectedNode.enabled) MsColors.success else MsColors.textMuted,
-                    fontSize = 9.sp,
+                    fontSize = 10.sp,
                     fontFamily = MsFonts.mono,
                 )
                 Spacer(Modifier.weight(1f))
@@ -225,7 +228,7 @@ fun NodeGraphPane(engine: EditorEngine, modifier: Modifier = Modifier) {
                     Text(
                         if (selectedNode.enabled) "Bypass" else "Enable",
                         color = MsColors.accentSoft,
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                     )
                 }
                 TextButton(
@@ -236,14 +239,14 @@ fun NodeGraphPane(engine: EditorEngine, modifier: Modifier = Modifier) {
                         if (selectedNode.id == engine.compSink) "Viewing" else "View this",
                         color = if (selectedNode.id == engine.compSink) MsColors.textMuted
                         else MsColors.info,
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                     )
                 }
                 TextButton(onClick = {
                     engine.removeCompNode(selectedNode.id)
                     selected = 0
                 }) {
-                    Text("Delete", color = MsColors.error, fontSize = 11.sp)
+                    Text("Delete", color = MsColors.error, fontSize = 12.sp)
                 }
             }
 
@@ -252,7 +255,7 @@ fun NodeGraphPane(engine: EditorEngine, modifier: Modifier = Modifier) {
                 Text(
                     "SOURCE  " + if (current.isEmpty()) "timeline sequence" else current.substringAfterLast('/'),
                     color = MsColors.textTertiary,
-                    fontSize = 9.sp,
+                    fontSize = 10.sp,
                     fontFamily = MsFonts.mono,
                     modifier = Modifier.padding(bottom = 3.dp),
                 )
@@ -277,7 +280,7 @@ fun NodeGraphPane(engine: EditorEngine, modifier: Modifier = Modifier) {
                 Text(
                     "This node has no editable parameters.",
                     color = MsColors.textMuted,
-                    fontSize = 10.sp,
+                    fontSize = 11.sp,
                 )
             } else {
                 knobs.forEach { knob ->
@@ -305,7 +308,7 @@ fun NodeGraphPane(engine: EditorEngine, modifier: Modifier = Modifier) {
                         Text(
                             "Add another node with a numeric knob to link against.",
                             color = MsColors.textMuted,
-                            fontSize = 10.sp,
+                            fontSize = 11.sp,
                         )
                     } else {
                         Row(
@@ -330,14 +333,15 @@ fun NodeGraphPane(engine: EditorEngine, modifier: Modifier = Modifier) {
 private fun SourceChip(label: String, selected: Boolean, onClick: () -> Unit) {
     Box(
         Modifier
-            .border(1.dp, if (selected) MsColors.accent else MsColors.border, RoundedCornerShape(2.dp))
+            .heightIn(min = 30.dp)
+            .border(1.dp, if (selected) MsColors.accent else MsColors.border, RoundedCornerShape(3.dp))
             .clickable { onClick() }
-            .padding(horizontal = 7.dp, vertical = 3.dp)
+            .padding(horizontal = 9.dp, vertical = 6.dp)
     ) {
         Text(
             label.uppercase(),
             color = if (selected) MsColors.accent else MsColors.textSecondary,
-            fontSize = 9.sp,
+            fontSize = 10.sp,
             fontFamily = MsFonts.mono,
         )
     }
@@ -359,9 +363,9 @@ private fun KnobRow(
             Text(
                 knob.label.uppercase(),
                 color = MsColors.textTertiary,
-                fontSize = 9.sp,
+                fontSize = 10.sp,
                 fontFamily = MsFonts.mono,
-                modifier = Modifier.width(76.dp),
+                modifier = Modifier.width(84.dp),
             )
             Slider(
                 // A linked knob is driven by its source, so dragging it would be a lie.
@@ -379,9 +383,9 @@ private fun KnobRow(
             Text(
                 "%.2f".format(value),
                 color = MsColors.textSecondary,
-                fontSize = 10.sp,
+                fontSize = 11.sp,
                 fontFamily = MsFonts.mono,
-                modifier = Modifier.width(46.dp),
+                modifier = Modifier.width(52.dp),
             )
             if (link == null) {
                 SourceChip(if (picking) "PICK…" else "LINK", picking) { onPickToggle() }
@@ -430,18 +434,18 @@ private fun CompNodeCard(
                 }
             }
     ) {
-        Column(Modifier.fillMaxSize().padding(start = 18.dp, end = 8.dp, top = 6.dp, bottom = 6.dp)) {
+        Column(Modifier.fillMaxSize().padding(start = 22.dp, end = 8.dp, top = 7.dp, bottom = 7.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     CompOps.name(node.op).uppercase(),
                     color = if (isSelected) MsColors.accent else MsColors.textSecondary,
-                    fontSize = 10.sp,
+                    fontSize = 11.sp,
                     fontFamily = MsFonts.mono,
                     fontWeight = FontWeight.Bold,
                 )
                 Spacer(Modifier.weight(1f))
                 Box(
-                    Modifier.size(5.dp).background(
+                    Modifier.size(6.dp).background(
                         if (node.enabled) MsColors.success else MsColors.textMuted,
                         CircleShape,
                     )
@@ -450,7 +454,7 @@ private fun CompNodeCard(
             Text(
                 "#${node.id}" + if (isSink) "  VIEW" else "",
                 color = if (isSink) MsColors.info else MsColors.textMuted,
-                fontSize = 9.sp,
+                fontSize = 10.sp,
                 fontFamily = MsFonts.mono,
             )
         }
@@ -463,15 +467,15 @@ private fun CompNodeCard(
             repeat(capacity) { slot ->
                 Box(
                     Modifier
-                        .size(14.dp)
-                        .background(MsColors.border, RoundedCornerShape(2.dp))
+                        .size(18.dp)
+                        .background(MsColors.border, RoundedCornerShape(3.dp))
                         .clickable { onConnect(slot) },
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         "${slot + 1}",
                         color = MsColors.textSecondary,
-                        fontSize = 7.sp,
+                        fontSize = 9.sp,
                         fontFamily = MsFonts.mono,
                     )
                 }

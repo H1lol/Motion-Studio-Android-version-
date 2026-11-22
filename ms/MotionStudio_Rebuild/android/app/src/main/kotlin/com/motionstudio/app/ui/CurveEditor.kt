@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -21,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -108,19 +110,20 @@ fun KeyframePane(engine: EditorEngine, modifier: Modifier = Modifier) {
                 Text(
                     if (count > 0) "$label $count" else label,
                     color = if (active) MsColors.background else MsColors.textSecondary,
-                    fontSize = 10.sp,
+                    fontSize = 11.sp,
                     fontFamily = MsFonts.mono,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier
+                        .heightIn(min = 32.dp)
                         .background(
                             if (active) MsColors.accent else MsColors.surfaceHigh,
-                            RoundedCornerShape(4.dp),
+                            RoundedCornerShape(5.dp),
                         )
                         .clickable {
                             channel = index
                             selected = -1
                         }
-                        .padding(horizontal = 9.dp, vertical = 6.dp),
+                        .padding(horizontal = 10.dp, vertical = 7.dp),
                 )
             }
         }
@@ -153,7 +156,7 @@ fun KeyframePane(engine: EditorEngine, modifier: Modifier = Modifier) {
                     "No keys on ${CHANNELS[channel].second}. \"Key at playhead\" captures " +
                         "the current value; with two keys the channel animates.",
                     color = MsColors.textMuted,
-                    fontSize = 10.sp,
+                    fontSize = 11.sp,
                 )
             } else {
                 val key = keys.getOrNull(selected)
@@ -162,13 +165,13 @@ fun KeyframePane(engine: EditorEngine, modifier: Modifier = Modifier) {
                         if (key == null) "TAP A KEY ON THE CURVE"
                         else "KEY ${key.index} · %.2fs · %.3f".format(key.time, key.value),
                         color = MsColors.accentSoft,
-                        fontSize = 10.sp,
+                        fontSize = 11.sp,
                         fontFamily = MsFonts.mono,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.weight(1f),
                     )
                     TextButton(onClick = { selected = -1 }) {
-                        Text("DESELECT", color = MsColors.textMuted, fontSize = 9.sp, fontFamily = MsFonts.mono)
+                        Text("DESELECT", color = MsColors.textMuted, fontSize = 11.sp, fontFamily = MsFonts.mono)
                     }
                 }
 
@@ -183,19 +186,20 @@ fun KeyframePane(engine: EditorEngine, modifier: Modifier = Modifier) {
                             Text(
                                 name,
                                 color = if (active) MsColors.background else MsColors.textSecondary,
-                                fontSize = 9.sp,
+                                fontSize = 11.sp,
                                 fontFamily = MsFonts.mono,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier
+                                    .heightIn(min = 30.dp)
                                     .background(
                                         if (active) MsColors.accent else MsColors.surfaceHigh,
-                                        RoundedCornerShape(4.dp),
+                                        RoundedCornerShape(5.dp),
                                     )
                                     .clickable {
                                         engine.setKeyframeInterp(prop, key.index, index)
                                         revision++
                                     }
-                                    .padding(horizontal = 8.dp, vertical = 5.dp),
+                                    .padding(horizontal = 10.dp, vertical = 6.dp),
                             )
                         }
                     }
@@ -229,7 +233,7 @@ fun KeyframePane(engine: EditorEngine, modifier: Modifier = Modifier) {
                     "Adds a key at the playhead. Tap a key to select it, drag it to retime " +
                         "and reshape the curve.",
                     color = MsColors.textMuted,
-                    fontSize = 9.sp,
+                    fontSize = 11.sp,
                     modifier = Modifier.weight(1f),
                 )
                 TextButton(onClick = {
@@ -240,14 +244,14 @@ fun KeyframePane(engine: EditorEngine, modifier: Modifier = Modifier) {
                     engine.addKeyframe(prop, value)
                     revision++
                 }) {
-                    Text("+ KEY", color = MsColors.accentSoft, fontSize = 10.sp, fontFamily = MsFonts.mono)
+                    Text("+ KEY", color = MsColors.accentSoft, fontSize = 11.sp, fontFamily = MsFonts.mono)
                 }
                 TextButton(onClick = {
                     engine.clearKeyframes(prop)
                     selected = -1
                     revision++
                 }) {
-                    Text("CLEAR", color = MsColors.error, fontSize = 10.sp, fontFamily = MsFonts.mono)
+                    Text("CLEAR", color = MsColors.error, fontSize = 11.sp, fontFamily = MsFonts.mono)
                 }
             }
         }
@@ -276,8 +280,10 @@ private fun CurveCanvas(
 
     // The key being dragged, drawn from these values until the gesture ends.
     var dragIndex by remember { mutableIntStateOf(-1) }
-    var dragTime by remember { mutableStateOf(0.0) }
-    var dragValue by remember { mutableStateOf(0.0) }
+    // Doubles get their own state: a boxed Double in mutableStateOf allocates on
+    // every drag event, which is the one place this pane must stay cheap.
+    var dragTime by remember { mutableDoubleStateOf(0.0) }
+    var dragValue by remember { mutableDoubleStateOf(0.0) }
 
     // A stable value range across the samples and keys, with a little air.
     var lo = Float.MAX_VALUE
@@ -309,7 +315,7 @@ private fun CurveCanvas(
     Canvas(
         Modifier
             .fillMaxWidth()
-            .height(150.dp)
+            .height(168.dp)
             .padding(horizontal = 12.dp)
             .border(1.dp, MsColors.border, RoundedCornerShape(3.dp))
             .onSizeChanged { canvasSize = it }
@@ -453,22 +459,28 @@ private fun Stepper(
             .padding(horizontal = 6.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, color = MsColors.textMuted, fontSize = 9.sp, fontFamily = MsFonts.mono)
+        Text(label, color = MsColors.textMuted, fontSize = 10.sp, fontFamily = MsFonts.mono)
         Spacer(Modifier.weight(1f))
         Text(
             "−",
             color = MsColors.accent,
-            fontSize = 14.sp,
+            fontSize = 17.sp,
             fontFamily = MsFonts.mono,
-            modifier = Modifier.clickable(onClick = onMinus).padding(horizontal = 7.dp),
+            modifier = Modifier
+                .heightIn(min = 34.dp)
+                .clickable(onClick = onMinus)
+                .padding(horizontal = 9.dp, vertical = 7.dp),
         )
-        Text(value, color = MsColors.textPrimary, fontSize = 11.sp, fontFamily = MsFonts.mono)
+        Text(value, color = MsColors.textPrimary, fontSize = 12.sp, fontFamily = MsFonts.mono)
         Text(
             "+",
             color = MsColors.accent,
-            fontSize = 14.sp,
+            fontSize = 17.sp,
             fontFamily = MsFonts.mono,
-            modifier = Modifier.clickable(onClick = onPlus).padding(horizontal = 7.dp),
+            modifier = Modifier
+                .heightIn(min = 34.dp)
+                .clickable(onClick = onPlus)
+                .padding(horizontal = 9.dp, vertical = 7.dp),
         )
     }
 }

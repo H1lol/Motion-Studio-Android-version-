@@ -1,5 +1,55 @@
 # Changelog
 
+## Unreleased — build verification and second interface pass
+
+### Added
+- **A build you can run.** `android/tools/verify.sh` compiles the app, runs the JVM unit
+  tests, runs Android lint and assembles the debug APK with the native engine for every
+  ABI. It reads `JAVA_HOME` and `ANDROID_HOME` and takes `GRADLE_MEMORY` for machines
+  smaller than the 3 GB default heap
+- **Alight Motion reference note.** `docs/alight-motion-reference.md` records how that
+  editor works from import to export as behaviour only — parenting and null objects,
+  per-interval easing, modal canvas gestures, project packages — with the gaps its own
+  documentation does not settle marked as such. No code, shader, string or asset came
+  from it
+
+### Fixed
+- **The preview allocated a `RectF` on every frame.** `PreviewView.onDraw` built the
+  aspect guide rectangle inside the draw pass, so a playing comp allocated at 60 Hz.
+  The rectangle is reused now
+- **The curve editor boxed a `Double` on every drag event.** Its drag time and value
+  used `mutableStateOf(0.0)`; they use `mutableDoubleStateOf`, so dragging a key no longer
+  allocates per pointer move
+- **The preview ignored accessibility clicks.** The view consumes its own touches but
+  never answered `performClick`, so an assistive "activate" did nothing. It reports the
+  click on touch-up and overrides `performClick`
+- **Three media permissions were requested and never used.** Import goes through
+  `ActivityResultContracts.OpenDocument`, which grants the chosen file, so
+  `READ_MEDIA_IMAGES`, `READ_MEDIA_VIDEO` and `READ_MEDIA_AUDIO` bought only a wider
+  permission prompt — and on Android 14 implied partial-photo handling that did not
+  exist. Removed, along with the activity's duplicate label
+
+### Changed
+- **More sheet, settings, curve editor and node graph now match the sheets.** They were
+  the last surfaces still on the old scale: 9 sp mono labels, 19 dp chips, 14 dp node
+  ports. All four use the shared `SheetSection` rule, a 10–11 sp floor for labels, 32–40 dp
+  targets for every chip and stepper, 18 dp graph ports and a 40 dp graph toolbar. The
+  node inspector is a weighted pane instead of a fixed 150 dp strip
+- **A real close button on the session sheet.** `MoreSheet` opened on a bare "Session"
+  heading with no way out but the drag handle; it uses `SheetHeader` like the rest
+
+### Verified
+- `assembleDebug` succeeds from a clean checkout with JDK 17, platform 35, build-tools
+  35.0.0, NDK 27.0.12077973 and CMake 3.22.1: Kotlin/Compose compile, resources link,
+  the C++ engine builds for arm64-v8a and x86_64, and a 64 MB debug APK is signed and
+  packaged
+- `testDebugUnitTest` passes (`ProjectDocTest`, `TimelineRulerTest`)
+- `lintDebug` passes with no errors; the remaining warnings are icon-shape and
+  dependency-version notices
+- Not verified: nothing was run on a device or emulator, so the visual pass, gestures,
+  playback, audio and export are unexercised. Motion Studio still has no instrumented
+  tests
+
 ## Unreleased — interface pass
 
 ### Fixed
@@ -39,10 +89,6 @@
 - **Dark only.** The theme no longer branches on the system light/dark setting: it always
   returned the same scheme, and the warning comment now says why
 
-### Verified
-- Kotlin/Compose were reviewed, not compiled: this environment has no Android SDK, Gradle
-  or Compose artifacts. Files were checked for balanced structure and imports; behaviour
-  is unverified on a device
 
 ## Unreleased — mix loudness meter
 

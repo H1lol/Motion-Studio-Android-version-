@@ -79,8 +79,8 @@ fun SettingsScreen(settings: SettingsStore, onBack: () -> Unit) {
                 accents.forEach { color ->
                     Box(
                         Modifier
-                            .padding(end = 10.dp)
-                            .size(34.dp)
+                            .padding(end = 12.dp)
+                            .size(42.dp)
                             .background(color, CircleShape)
                             .then(
                                 if (settings.accent == color) {
@@ -91,7 +91,7 @@ fun SettingsScreen(settings: SettingsStore, onBack: () -> Unit) {
                         contentAlignment = Alignment.Center,
                     ) {
                         if (settings.accent == color) {
-                            Box(Modifier.size(12.dp).background(Color.White, CircleShape))
+                            Box(Modifier.size(14.dp).background(Color.White, CircleShape))
                         }
                     }
                 }
@@ -226,21 +226,17 @@ private fun Chip(label: String, onClick: () -> Unit) {
         fontWeight = FontWeight.Bold,
         fontFamily = MsFonts.mono,
         modifier = Modifier
+            .heightIn(min = 36.dp)
             .clickable(onClick = onClick)
             .background(MsColors.surfaceHigh, CircleShape)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .padding(horizontal = 14.dp, vertical = 9.dp),
     )
 }
 
 @Composable
 private fun Section(title: String, content: @Composable () -> Unit) {
-    Text(
-        title.uppercase(),
-        color = MsColors.textMuted,
-        fontSize = 10.sp,
-        fontWeight = FontWeight.Bold,
-        letterSpacing = 1.sp,
-        modifier = Modifier.padding(start = 16.dp, top = 18.dp, bottom = 8.dp),
-    )
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+        SheetSection(title)
+    }
     content()
 }
