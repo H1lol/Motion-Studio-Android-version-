@@ -138,6 +138,14 @@ public:
   const AudioEffectChain& effects() const { return effects_; }
 
 private:
+  /**
+   * Mirrors each track's document insert list into its running chain. Only a
+   * genuine parameter change is pushed down: AudioEffectChain::set() drops the
+   * derived DSP state, so re-applying an unchanged list every block would clear
+   * the delay lines and reverb tails on every audio callback.
+   */
+  void sync_track_chains();
+
   ProjectSession* session_ = nullptr;
   FFmpegPaths paths_;
   TimeSec time_ = 0;
@@ -145,6 +153,10 @@ private:
   float fps_ = 24.f;
   // cache path -> decoder
   std::unordered_map<std::string, std::unique_ptr<AudioDecoderFFmpeg>> decoders_;
+  // One stateful chain per track that carries inserts, keyed by track id.
+  std::unordered_map<TrackId, AudioEffectChain> track_chains_;
+  // Scratch mix for a track with inserts, reused between blocks.
+  std::vector<float> track_scratch_;
   AudioEffectChain effects_;
 };
 

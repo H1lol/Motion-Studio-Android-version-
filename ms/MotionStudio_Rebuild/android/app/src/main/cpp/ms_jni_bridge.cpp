@@ -264,6 +264,70 @@ Java_com_motionstudio_app_native_NativeEngine_nativeTrackGain(JNIEnv*, jobject, 
     return ms_track_gain(track, gain) == 0 ? JNI_TRUE : JNI_FALSE;
 }
 
+// ---- Per-track insert chain ----------------------------------------------
+JNIEXPORT jint JNICALL
+Java_com_motionstudio_app_native_NativeEngine_nativeTrackFxCount(JNIEnv*, jobject, jint track) {
+    return ms_track_fx_count(track);
+}
+
+JNIEXPORT jint JNICALL
+Java_com_motionstudio_app_native_NativeEngine_nativeTrackFxAdd(JNIEnv*, jobject, jint track,
+                                                               jint kind) {
+    return ms_track_fx_add(track, kind);
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_motionstudio_app_native_NativeEngine_nativeTrackFxRemove(JNIEnv*, jobject, jint track,
+                                                                  jint index) {
+    return ms_track_fx_remove(track, index) == 0 ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_motionstudio_app_native_NativeEngine_nativeTrackFxClear(JNIEnv*, jobject, jint track) {
+    return ms_track_fx_clear(track) == 0 ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_motionstudio_app_native_NativeEngine_nativeTrackFxKind(JNIEnv*, jobject, jint track,
+                                                                jint index) {
+    return ms_track_fx_kind(track, index);
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_motionstudio_app_native_NativeEngine_nativeTrackFxSetEnabled(
+        JNIEnv*, jobject, jint track, jint index, jboolean enabled) {
+    return ms_track_fx_set_enabled(track, index, enabled == JNI_TRUE ? 1 : 0) == 0 ? JNI_TRUE
+                                                                                  : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_motionstudio_app_native_NativeEngine_nativeTrackFxEnabled(JNIEnv*, jobject, jint track,
+                                                                   jint index) {
+    return ms_track_fx_enabled(track, index) == 1 ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_motionstudio_app_native_NativeEngine_nativeTrackFxSetParam(JNIEnv* env, jobject,
+        jint track, jint index, jstring name, jfloat value) {
+    if (!name) return JNI_FALSE;
+    const char* utf = env->GetStringUTFChars(name, nullptr);
+    if (!utf) return JNI_FALSE;
+    const int rc = ms_track_fx_set_param(track, index, utf, value);
+    env->ReleaseStringUTFChars(name, utf);
+    return rc == 0 ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jfloat JNICALL
+Java_com_motionstudio_app_native_NativeEngine_nativeTrackFxGetParam(JNIEnv* env, jobject,
+        jint track, jint index, jstring name, jfloat fallback) {
+    if (!name) return fallback;
+    const char* utf = env->GetStringUTFChars(name, nullptr);
+    if (!utf) return fallback;
+    const float value = ms_track_fx_get_param(track, index, utf, fallback);
+    env->ReleaseStringUTFChars(name, utf);
+    return value;
+}
+
 JNIEXPORT jboolean JNICALL
 Java_com_motionstudio_app_native_NativeEngine_nativeLookLoad(JNIEnv* env, jobject, jstring path) {
     if (!path) return JNI_FALSE;

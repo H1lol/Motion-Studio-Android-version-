@@ -117,6 +117,17 @@ object NativeEngine {
     external fun nativeAudioFxGetParam(index: Int, name: String, fallback: Float): Float
     external fun nativeTrackGain(trackId: Int, gain: Float): Boolean
 
+    // Per-track insert chain (same kinds/parameter names as the master chain)
+    external fun nativeTrackFxCount(trackId: Int): Int
+    external fun nativeTrackFxAdd(trackId: Int, kind: Int): Int
+    external fun nativeTrackFxRemove(trackId: Int, index: Int): Boolean
+    external fun nativeTrackFxClear(trackId: Int): Boolean
+    external fun nativeTrackFxKind(trackId: Int, index: Int): Int
+    external fun nativeTrackFxSetEnabled(trackId: Int, index: Int, enabled: Boolean): Boolean
+    external fun nativeTrackFxEnabled(trackId: Int, index: Int): Boolean
+    external fun nativeTrackFxSetParam(trackId: Int, index: Int, name: String, value: Float): Boolean
+    external fun nativeTrackFxGetParam(trackId: Int, index: Int, name: String, fallback: Float): Float
+
     // Master grade + scopes
     external fun nativeGradeSet(
         exposure: Float,

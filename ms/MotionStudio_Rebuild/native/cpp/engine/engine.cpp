@@ -431,6 +431,71 @@ int Engine::audio_insert_count() const {
     return audio_ ? static_cast<int>(audio_->effects().parameters().size()) : 0;
 }
 
+int Engine::add_track_insert(TrackId track, const AudioFxParams& params) {
+    if (!project_) return -1;
+    TrackInfo* t = project_->find_track(track);
+    if (!t) return -1;
+    project_->push_undo();
+    t->audio_inserts.push_back(params);
+    project_->mark_dirty();
+    // The mixer notices the new insert on its next block; no frame cache to drop.
+    return static_cast<int>(t->audio_inserts.size()) - 1;
+}
+
+bool Engine::remove_track_insert(TrackId track, int index) {
+    if (!project_ || index < 0) return false;
+    TrackInfo* t = project_->find_track(track);
+    if (!t || static_cast<size_t>(index) >= t->audio_inserts.size()) return false;
+    project_->push_undo();
+    t->audio_inserts.erase(t->audio_inserts.begin() + index);
+    project_->mark_dirty();
+    return true;
+}
+
+void Engine::clear_track_inserts(TrackId track) {
+    if (!project_) return;
+    TrackInfo* t = project_->find_track(track);
+    if (!t || t->audio_inserts.empty()) return;
+    project_->push_undo();
+    t->audio_inserts.clear();
+    project_->mark_dirty();
+}
+
+bool Engine::set_track_insert(TrackId track, int index, const AudioFxParams& params) {
+    if (!project_ || index < 0) return false;
+    TrackInfo* t = project_->find_track(track);
+    if (!t || static_cast<size_t>(index) >= t->audio_inserts.size()) return false;
+    t->audio_inserts[static_cast<size_t>(index)] = params;
+    project_->mark_dirty();
+    return true;
+}
+
+bool Engine::set_track_insert_enabled(TrackId track, int index, bool enabled) {
+    if (!project_ || index < 0) return false;
+    TrackInfo* t = project_->find_track(track);
+    if (!t || static_cast<size_t>(index) >= t->audio_inserts.size()) return false;
+    AudioFxParams& p = t->audio_inserts[static_cast<size_t>(index)];
+    if (p.enabled == enabled) return true;
+    project_->push_undo();
+    p.enabled = enabled;
+    project_->mark_dirty();
+    return true;
+}
+
+int Engine::track_insert_count(TrackId track) const {
+    if (!project_) return 0;
+    TrackInfo* t = project_->find_track(track);
+    return t ? static_cast<int>(t->audio_inserts.size()) : 0;
+}
+
+bool Engine::track_insert_params(TrackId track, int index, AudioFxParams* out) const {
+    if (!project_ || index < 0) return false;
+    TrackInfo* t = project_->find_track(track);
+    if (!t || static_cast<size_t>(index) >= t->audio_inserts.size()) return false;
+    if (out) *out = t->audio_inserts[static_cast<size_t>(index)];
+    return true;
+}
+
 bool Engine::set_effect_param(EffectId effect, const std::string& name, float value) {
     (void)effect; (void)name; (void)value;
     // Effect IDs are intentionally lightweight in the first native API. Parameters are stored by name in EffectOp.

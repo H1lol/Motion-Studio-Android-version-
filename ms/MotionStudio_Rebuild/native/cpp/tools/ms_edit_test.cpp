@@ -457,6 +457,39 @@ int main() {
         check(still != nullptr, "undo of a chain edit kept the timeline");
     }
 
+    // Per-track insert chains: owned by the track, saved with the document,
+    // separate from the master bus, and undoable on structure edits.
+    {
+        AudioFxParams comp;
+        comp.kind = AudioFxKind::Compressor;
+        comp.threshold_db = -12.5f;
+        check(e.add_track_insert(track, comp) == 0, "track insert added");
+        check(e.track_insert_count(track) == 1, "track insert counted");
+        check(e.track_insert_count(9999) == 0, "unknown track has no inserts");
+
+        const std::string tj = e.project_to_json();
+        check(e.load_project_json(tj), "reload with a track insert");
+        check(e.track_insert_count(track) == 1, "track insert restored");
+        AudioFxParams back;
+        check(e.track_insert_params(track, 0, &back), "track insert readable");
+        check(back.kind == AudioFxKind::Compressor &&
+                  std::fabs(back.threshold_db + 12.5f) < 1e-4f,
+              "track insert params restored");
+        check(!e.track_insert_params(track, 5, &back), "out-of-range track insert rejected");
+
+        check(e.set_track_insert_enabled(track, 0, false), "track insert bypassed");
+        AudioFxParams byp;
+        check(e.track_insert_params(track, 0, &byp) && !byp.enabled, "bypass stored");
+        check(e.audio_insert_count() == 0, "track insert does not touch the master chain");
+
+        check(e.remove_track_insert(track, 0), "track insert removed");
+        check(e.track_insert_count(track) == 0, "track chain empty after remove");
+        check(e.undo(), "undo after a track chain edit");
+        check(e.track_insert_count(track) == 1, "undo restored the track insert");
+        e.clear_track_inserts(track);
+        check(e.track_insert_count(track) == 0, "track chain cleared");
+    }
+
     // Keyframe curves: read-back, interpolation modes and a save/load round trip.
     {
         check(e.add_keyframe(track, clip, 0, 0.0, 0.0), "curve: key 0 added");

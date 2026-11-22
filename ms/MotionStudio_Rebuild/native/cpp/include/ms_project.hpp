@@ -85,6 +85,10 @@ struct TrackInfo {
   bool visible = true;
   float gain = 1.f;
   bool solo = false;
+  // Insert chain for this track alone, run over the track's clips before they
+  // reach the master bus. Saved with the track, so a mixed project reopens with
+  // its track processing intact. Empty means the track passes through dry.
+  std::vector<AudioFxParams> audio_inserts;
   std::vector<ClipInfo> clips;
   std::vector<TimelineTransition> transitions;
 };

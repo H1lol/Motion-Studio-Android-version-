@@ -96,10 +96,13 @@ sheet switches between Sequence and Selected clip. Missing: curves, colour wheel
 several LUTs on one clip.
 
 ### 6. Audio depth
-Export carries AAC audio, and audio clips now draw a real waveform from decoded PCM. The master insert chain is now editable from the app (Gain, 3-band EQ, compressor, delay, reverb, limiter) with a MIX sheet carrying per-track faders, mute and solo; clip gain and pan are honoured by the mix. The master grade and the master insert chain are saved with the project document (a `master` block holding the seven grade values and every insert parameter), and insert structure edits — add, remove, clear, bypass — are on the undo stack; knob values and the grade are persisted without one undo entry per slider frame. Still missing: insert chains per track (only the master bus has one), audio automation curves, sample-rate choice, and loudness metering.
+Export carries AAC audio, and audio clips now draw a real waveform from decoded PCM. The master insert chain is now editable from the app (Gain, 3-band EQ, compressor, delay, reverb, limiter) with a MIX sheet carrying per-track faders, mute and solo; clip gain and pan are honoured by the mix. The master grade and the master insert chain are saved with the project document (a `master` block holding the seven grade values and every insert parameter), and insert structure edits — add, remove, clear, bypass — are on the undo stack; knob values and the grade are persisted without one undo entry per slider frame. Closed since this list was written: insert chains per track — every track carries its own
+chain, run over that track's clips before the master bus, kept stateful in the mixer,
+saved with the track and editable from a **CHAIN** chip in `MIX`.
+Still missing: audio automation curves, sample-rate choice, and loudness metering.
 
 ### 6b. Effect catalogue size
-39 CPU effects against Kdenlive's roughly 84 hand-written effect definitions plus 145 MLT avfilter and 118 frei0r entries. Most of that gap is provided by third-party GPL plugins we cannot link; adding them would relicense the app. Audio effects are still the thinnest area: the master bus has six inserts, but tracks cannot host their own chain and there is no audio keyframing.
+39 CPU effects against Kdenlive's roughly 84 hand-written effect definitions plus 145 MLT avfilter and 118 frei0r entries. Most of that gap is provided by third-party GPL plugins we cannot link; adding them would relicense the app. Audio effects are still the thinnest area: the master bus has six inserts and every track now hosts its own six-kind chain and gain stage, but there is no audio keyframing.
 
 ### 7. Playback performance
 Closed since this list was written: decode is no longer seek-per-frame (`IMediaDecoder::read_video_at`

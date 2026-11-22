@@ -461,6 +461,18 @@ std::string ProjectSession::to_json() const {
          << ", \"duration\": " << x.duration << ", \"softness\": " << x.softness << "}";
       if (xi + 1 < t.transitions.size()) ss << ", ";
     }
+    ss << "]";
+    // Track-local insert chain, written with the same field table as the master
+    // bus so a knob name never drifts between the two.
+    ss << ", \"audio_inserts\": [";
+    for (size_t ai = 0; ai < t.audio_inserts.size(); ++ai) {
+      const AudioFxParams& p = t.audio_inserts[ai];
+      ss << "{\"kind\": " << static_cast<int>(p.kind)
+         << ", \"enabled\": " << (p.enabled ? "true" : "false");
+      for (const auto& f : kFxFields) ss << ", \"" << f.key << "\": " << p.*(f.member);
+      ss << "}";
+      if (ai + 1 < t.audio_inserts.size()) ss << ", ";
+    }
     ss << "]}";
     if (ti + 1 < impl_->track_list.size()) ss << ",";
     ss << "\n";
@@ -642,6 +654,16 @@ Error ProjectSession::load_from_json(const std::string& json) {
       // an opened project cleared the animation that had just been loaded.
       c.motion.ensure_defaults();
       if(!c.id)c.id=impl_->next_clip++; else impl_->next_clip=std::max(impl_->next_clip,c.id+1); t.clips.push_back(std::move(c));
+    }
+    for (const auto& ao : array_objects(obj, "audio_inserts")) {
+      AudioFxParams p;
+      const int kind = static_cast<int>(extract_number(ao, "kind", 0));
+      if (kind < 0 || kind > static_cast<int>(AudioFxKind::Limiter)) continue;
+      p.kind = static_cast<AudioFxKind>(kind);
+      p.enabled = ao.find("\"enabled\": false") == std::string::npos;
+      for (const auto& f : kFxFields)
+        p.*(f.member) = static_cast<float>(extract_number(ao, f.key, p.*(f.member)));
+      t.audio_inserts.push_back(p);
     }
     for (const auto& xo : array_objects(obj, "transitions")) {
       TimelineTransition x;

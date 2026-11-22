@@ -1616,6 +1616,63 @@ class EditorEngine(
         return ok
     }
 
+    // ---- Per-track insert chains --------------------------------------------
+
+    fun trackAudioInserts(trackId: Int): List<AudioInsert> {
+        val count = NativeEngine.nativeTrackFxCount(trackId)
+        if (count <= 0) return emptyList()
+        return (0 until count).mapNotNull { i ->
+            val kind = NativeEngine.nativeTrackFxKind(trackId, i)
+            if (kind < 0) null else AudioInsert(i, kind, NativeEngine.nativeTrackFxEnabled(trackId, i))
+        }
+    }
+
+    fun addTrackAudioInsert(trackId: Int, kind: Int): Boolean {
+        if (NativeEngine.nativeTrackFxAdd(trackId, kind) < 0) {
+            status = "Could not add that insert to the track"
+            return false
+        }
+        audioRevision++
+        markDirty()
+        status = "Added ${AUDIO_INSERT_NAMES.getOrElse(kind) { "insert" }} to the track"
+        return true
+    }
+
+    fun removeTrackAudioInsert(trackId: Int, index: Int): Boolean {
+        if (!NativeEngine.nativeTrackFxRemove(trackId, index)) {
+            status = "Could not remove that insert"
+            return false
+        }
+        audioRevision++
+        markDirty()
+        return true
+    }
+
+    fun clearTrackAudioInserts(trackId: Int) {
+        NativeEngine.nativeTrackFxClear(trackId)
+        audioRevision++
+        markDirty()
+        status = "Track chain cleared"
+    }
+
+    fun setTrackAudioInsertEnabled(trackId: Int, index: Int, enabled: Boolean): Boolean {
+        val ok = NativeEngine.nativeTrackFxSetEnabled(trackId, index, enabled)
+        if (ok) {
+            audioRevision++
+            markDirty()
+        }
+        return ok
+    }
+
+    fun trackAudioInsertParam(trackId: Int, index: Int, name: String, fallback: Float): Float =
+        NativeEngine.nativeTrackFxGetParam(trackId, index, name, fallback)
+
+    fun setTrackAudioInsertParam(trackId: Int, index: Int, name: String, value: Float): Boolean {
+        val ok = NativeEngine.nativeTrackFxSetParam(trackId, index, name, value)
+        if (ok) markDirty()
+        return ok
+    }
+
     fun setTrackGain(trackId: Int, gain: Float): Boolean {
         val ok = NativeEngine.nativeTrackGain(trackId, gain)
         if (ok) {

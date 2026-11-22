@@ -1,5 +1,36 @@
 # Changelog
 
+## Unreleased — per-track insert chains
+
+### Added
+- **Track processing.** Every track now carries its own insert chain, applied to that
+  track's clips before the master bus. Previously only the master bus had inserts, so
+  cleaning up one noisy source meant processing the whole mix. The chain uses the same
+  six insert kinds and the same parameter names as the master chain (Gain, 3-band EQ,
+  compressor, delay, reverb, limiter)
+- **Stateful per track.** The mixer keeps one running `AudioEffectChain` per track, so a
+  reverb tail or delay repeat continues across audio callbacks. A parameter edit updates
+  the chain in place; only a structural change (add, remove, kind swap) rebuilds it
+- **Saved with the project.** Track inserts are written into the track record as
+  `"audio_inserts"` and parsed back, so a mixed project reopens with its processing
+  intact. Documents written before this load with dry tracks, as before
+- **Engine surface.** `add_track_insert`, `remove_track_insert`, `clear_track_inserts`,
+  `set_track_insert`, `set_track_insert_enabled`, `track_insert_count` and
+  `track_insert_params`; structure edits are undoable, knob values are not, matching the
+  master chain. Bridged as `ms_track_fx_*` and surfaced in `MIX` via a per-track
+  **CHAIN** chip that expands to the track's inserts
+
+### Verified
+- `ms_edit_test`: a track insert is added, counted, saved and reloaded with its kind and
+  threshold, an out-of-range index is rejected, bypass is stored, the master chain stays
+  untouched, a structure edit undoes, and clearing empties the chain
+- `bridge/ms_bridge.cpp` compiles clean under `-fsyntax-only`. Kotlin/JNI and Compose were
+  not compiled here (no Android toolchain in this environment)
+
+### Provenance
+- Original work. The insert DSP is the project's own `AudioEffectChain`; no third-party
+  effect code was copied
+
 ## Unreleased — three finishing looks
 
 ### Added

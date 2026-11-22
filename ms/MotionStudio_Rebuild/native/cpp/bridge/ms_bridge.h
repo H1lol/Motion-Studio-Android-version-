@@ -101,6 +101,22 @@ float ms_audio_fx_get_param(int index, const char* name, float fallback);
 /** Track fader, linear gain (1 = unity). Applies to the timeline audio mix. */
 int ms_track_gain(int track_id, float gain);
 
+// ---- Per-track insert chain ----------------------------------------------
+// Same insert kinds and parameter names as the master chain, but applied to one
+// track's clips before the master bus. Saved with the project document, so a
+// mixed session reopens with its track processing.
+int ms_track_fx_count(int track_id);
+/** Appends an insert and returns its index, or -1 on a bad track or kind. */
+int ms_track_fx_add(int track_id, int kind);
+int ms_track_fx_remove(int track_id, int index);
+int ms_track_fx_clear(int track_id);
+int ms_track_fx_kind(int track_id, int index);
+int ms_track_fx_set_enabled(int track_id, int index, int enabled);
+int ms_track_fx_enabled(int track_id, int index);
+/** Parameter names are the same as ms_audio_fx_set_param. */
+int ms_track_fx_set_param(int track_id, int index, const char* name, float value);
+float ms_track_fx_get_param(int track_id, int index, const char* name, float fallback);
+
 // Display look (3D .cube LUT) applied to the rendered preview frame.
 // Returns 0 on success, -1 if the file is missing or malformed.
 int ms_look_load(const char* path);

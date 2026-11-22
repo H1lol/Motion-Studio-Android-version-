@@ -22,8 +22,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -138,7 +141,22 @@ fun AudioSheet(engine: EditorEngine, onDismiss: () -> Unit) {
                     }
                 }
                 items(inserts) { insert ->
-                    InsertCard(engine, insert, drafts)
+                    InsertCard(
+                        title = AUDIO_INSERT_NAMES.getOrElse(insert.kind) { "Insert" },
+                        subtitle = "INSERT ${insert.index + 1}",
+                        kind = insert.kind,
+                        enabled = insert.enabled,
+                        draftPrefix = "m",
+                        drafts = drafts,
+                        onEnabledChange = { engine.setAudioInsertEnabled(insert.index, it) },
+                        onRemove = { engine.removeAudioInsert(insert.index) },
+                        param = { name, fallback ->
+                            engine.audioInsertParam(insert.index, name, fallback)
+                        },
+                        onParam = { name, value ->
+                            engine.setAudioInsertParam(insert.index, name, value)
+                        },
+                    )
                 }
                 if (inserts.isNotEmpty()) {
                     item {
@@ -181,7 +199,7 @@ fun AudioSheet(engine: EditorEngine, onDismiss: () -> Unit) {
                         )
                     }
                 }
-                items(tracks) { track -> TrackStrip(engine, track) }
+                items(tracks) { track -> TrackStrip(engine, track, revision, drafts) }
             }
             Spacer(Modifier.height(20.dp))
         }
@@ -201,34 +219,36 @@ private fun SectionLabel(text: String) {
 
 @Composable
 private fun InsertCard(
-    engine: EditorEngine,
-    insert: AudioInsert,
+    title: String,
+    subtitle: String,
+    kind: Int,
+    enabled: Boolean,
+    draftPrefix: String,
     drafts: MutableMap<String, Float>,
+    onEnabledChange: (Boolean) -> Unit,
+    onRemove: () -> Unit,
+    param: (String, Float) -> Float,
+    onParam: (String, Float) -> Unit,
 ) {
-    val name = AUDIO_INSERT_NAMES.getOrElse(insert.kind) { "Insert" }
     Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(name, color = MsColors.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                Text(title, color = MsColors.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
                 Text(
-                    "INSERT ${insert.index + 1}" + if (insert.enabled) "" else " · BYPASSED",
-                    color = if (insert.enabled) MsColors.textMuted else MsColors.warning,
+                    subtitle + if (enabled) "" else " · BYPASSED",
+                    color = if (enabled) MsColors.textMuted else MsColors.warning,
                     fontSize = 9.sp,
                     fontFamily = MsFonts.mono,
                 )
             }
-            Switch(
-                checked = insert.enabled,
-                onCheckedChange = { engine.setAudioInsertEnabled(insert.index, it) },
-            )
-            TextButton(onClick = { engine.removeAudioInsert(insert.index) }) {
+            Switch(checked = enabled, onCheckedChange = onEnabledChange)
+            TextButton(onClick = onRemove) {
                 Text("Remove", color = MsColors.error, fontSize = 11.sp)
             }
         }
-        audioKnobs(insert.kind).forEach { knob ->
-            val key = "${insert.index}:${knob.name}"
-            val current = drafts[key]
-                ?: engine.audioInsertParam(insert.index, knob.name, knob.default)
+        audioKnobs(kind).forEach { knob ->
+            val key = "$draftPrefix:${knob.name}"
+            val current = drafts[key] ?: param(knob.name, knob.default)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     knob.label,
@@ -241,10 +261,10 @@ private fun InsertCard(
                     value = current.coerceIn(knob.min, knob.max),
                     onValueChange = {
                         drafts[key] = it
-                        engine.setAudioInsertParam(insert.index, knob.name, it)
+                        onParam(knob.name, it)
                     },
                     valueRange = knob.min..knob.max,
-                    enabled = insert.enabled,
+                    enabled = enabled,
                     modifier = Modifier.weight(1f),
                 )
                 Text(
@@ -260,8 +280,15 @@ private fun InsertCard(
 }
 
 @Composable
-private fun TrackStrip(engine: EditorEngine, track: NativeTrack) {
+private fun TrackStrip(
+    engine: EditorEngine,
+    track: NativeTrack,
+    revision: Int,
+    drafts: MutableMap<String, Float>,
+) {
     val gain = track.gain.toFloat().coerceIn(0f, 2f)
+    var chainOpen by remember(track.id) { mutableStateOf(false) }
+    val chain = remember(revision, track.id) { engine.trackAudioInserts(track.id) }
     Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Column(Modifier.weight(1f)) {
@@ -275,6 +302,9 @@ private fun TrackStrip(engine: EditorEngine, track: NativeTrack) {
             }
             MiniChip("MUTE", track.muted) { engine.toggleTrackMuted(track.id) }
             MiniChip("SOLO", track.solo) { engine.toggleTrackSolo(track.id) }
+            MiniChip(if (chain.isEmpty()) "CHAIN" else "CHAIN ${chain.size}", chainOpen) {
+                chainOpen = !chainOpen
+            }
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
@@ -297,6 +327,62 @@ private fun TrackStrip(engine: EditorEngine, track: NativeTrack) {
                 fontFamily = MsFonts.mono,
                 modifier = Modifier.padding(start = 6.dp),
             )
+        }
+        if (chainOpen) {
+            // Inserts here run over this track's clips before the master bus.
+            chain.forEach { insert ->
+                InsertCard(
+                    title = AUDIO_INSERT_NAMES.getOrElse(insert.kind) { "Insert" },
+                    subtitle = "${track.name.uppercase()} · INSERT ${insert.index + 1}",
+                    kind = insert.kind,
+                    enabled = insert.enabled,
+                    draftPrefix = "t${track.id}",
+                    drafts = drafts,
+                    onEnabledChange = {
+                        engine.setTrackAudioInsertEnabled(track.id, insert.index, it)
+                    },
+                    onRemove = { engine.removeTrackAudioInsert(track.id, insert.index) },
+                    param = { name, fallback ->
+                        engine.trackAudioInsertParam(track.id, insert.index, name, fallback)
+                    },
+                    onParam = { name, value ->
+                        engine.setTrackAudioInsertParam(track.id, insert.index, name, value)
+                    },
+                )
+            }
+            AUDIO_INSERT_NAMES.chunked(3).forEach { row ->
+                Row(
+                    Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    row.forEach { name ->
+                        Box(Modifier.weight(1f)) {
+                            TextButton(
+                                onClick = {
+                                    engine.addTrackAudioInsert(
+                                        track.id,
+                                        AUDIO_INSERT_NAMES.indexOf(name),
+                                    )
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text(
+                                    "+ $name",
+                                    color = MsColors.accentSoft,
+                                    fontSize = 10.sp,
+                                    maxLines = 1,
+                                )
+                            }
+                        }
+                    }
+                    repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+                }
+            }
+            if (chain.isNotEmpty()) {
+                TextButton(onClick = { engine.clearTrackAudioInserts(track.id) }) {
+                    Text("Clear ${track.name} chain", color = MsColors.error, fontSize = 11.sp)
+                }
+            }
         }
     }
 }

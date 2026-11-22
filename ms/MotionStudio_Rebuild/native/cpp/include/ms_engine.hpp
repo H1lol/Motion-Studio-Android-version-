@@ -75,6 +75,21 @@ public:
     bool set_audio_insert_enabled(int index, bool enabled);
     int  audio_insert_count() const;
 
+    // ---- Per-track insert chain -------------------------------------------
+    // Each track runs its own chain over its clips before the master bus, so a
+    // noisy source can be EQ'd or limited without touching the rest of the mix.
+    // The chain lives in the track (and therefore in the document); structure
+    // edits are undoable, knob values are not, exactly like the master bus.
+    /** Appends an insert to the track and returns its index, or -1. */
+    int  add_track_insert(TrackId track, const AudioFxParams& params);
+    bool remove_track_insert(TrackId track, int index);
+    void clear_track_inserts(TrackId track);
+    bool set_track_insert(TrackId track, int index, const AudioFxParams& params);
+    bool set_track_insert_enabled(TrackId track, int index, bool enabled);
+    int  track_insert_count(TrackId track) const;
+    /** Reads one insert's full parameter set; false when the index is out of range. */
+    bool track_insert_params(TrackId track, int index, AudioFxParams* out) const;
+
     // Effect helpers
     bool add_effect_to_clip(ClipId clip, const std::string& base_id);
     bool set_effect_param(EffectId effect, const std::string& name, float value);

@@ -732,6 +732,63 @@ int ms_track_gain(int track_id, float gain) {
     return eng().set_track_gain(static_cast<ms::TrackId>(track_id), gain) ? 0 : -1;
 }
 
+// ---- Per-track insert chain ----------------------------------------------
+int ms_track_fx_count(int track_id) {
+    return eng().track_insert_count(static_cast<ms::TrackId>(track_id));
+}
+
+int ms_track_fx_add(int track_id, int kind) {
+    if (kind < 0 || kind > static_cast<int>(ms::AudioFxKind::Limiter)) return -1;
+    ms::AudioFxParams params;
+    params.kind = static_cast<ms::AudioFxKind>(kind);
+    return eng().add_track_insert(static_cast<ms::TrackId>(track_id), params);
+}
+
+int ms_track_fx_remove(int track_id, int index) {
+    return eng().remove_track_insert(static_cast<ms::TrackId>(track_id), index) ? 0 : -1;
+}
+
+int ms_track_fx_clear(int track_id) {
+    eng().clear_track_inserts(static_cast<ms::TrackId>(track_id));
+    return 0;
+}
+
+int ms_track_fx_kind(int track_id, int index) {
+    ms::AudioFxParams p;
+    if (!eng().track_insert_params(static_cast<ms::TrackId>(track_id), index, &p)) return -1;
+    return static_cast<int>(p.kind);
+}
+
+int ms_track_fx_set_enabled(int track_id, int index, int enabled) {
+    return eng().set_track_insert_enabled(static_cast<ms::TrackId>(track_id), index,
+                                          enabled != 0) ? 0 : -1;
+}
+
+int ms_track_fx_enabled(int track_id, int index) {
+    ms::AudioFxParams p;
+    if (!eng().track_insert_params(static_cast<ms::TrackId>(track_id), index, &p)) return 0;
+    return p.enabled ? 1 : 0;
+}
+
+int ms_track_fx_set_param(int track_id, int index, const char* name, float value) {
+    if (!name) return -1;
+    const AudioFxField* field = find_audio_fx_field(name);
+    if (!field) return -1;
+    ms::AudioFxParams p;
+    if (!eng().track_insert_params(static_cast<ms::TrackId>(track_id), index, &p)) return -1;
+    p.*(field->member) = value;
+    return eng().set_track_insert(static_cast<ms::TrackId>(track_id), index, p) ? 0 : -1;
+}
+
+float ms_track_fx_get_param(int track_id, int index, const char* name, float fallback) {
+    if (!name) return fallback;
+    const AudioFxField* field = find_audio_fx_field(name);
+    if (!field) return fallback;
+    ms::AudioFxParams p;
+    if (!eng().track_insert_params(static_cast<ms::TrackId>(track_id), index, &p)) return fallback;
+    return p.*(field->member);
+}
+
 // ------------------------------------------------------------- proxies ------
 int ms_proxy_register(const char* media_path, const char* proxy_path) {
     if (!media_path || !proxy_path) return -1;

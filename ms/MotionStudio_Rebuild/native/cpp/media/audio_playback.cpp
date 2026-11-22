@@ -13,6 +13,25 @@
 namespace ms {
 namespace fs = std::filesystem;
 
+namespace {
+
+// Field-by-field so a document change is detected without touching padding, and
+// so an untouched chain keeps its reverb/delay tails running across blocks.
+bool same_fx(const AudioFxParams& a, const AudioFxParams& b) {
+  return a.kind == b.kind && a.enabled == b.enabled && a.wet == b.wet &&
+         a.gain_db == b.gain_db && a.low_gain_db == b.low_gain_db &&
+         a.low_freq_hz == b.low_freq_hz && a.mid_gain_db == b.mid_gain_db &&
+         a.mid_freq_hz == b.mid_freq_hz && a.mid_q == b.mid_q &&
+         a.high_gain_db == b.high_gain_db && a.high_freq_hz == b.high_freq_hz &&
+         a.threshold_db == b.threshold_db && a.ratio == b.ratio &&
+         a.attack_ms == b.attack_ms && a.release_ms == b.release_ms &&
+         a.makeup_db == b.makeup_db && a.delay_ms == b.delay_ms &&
+         a.feedback == b.feedback && a.room_size == b.room_size &&
+         a.damping == b.damping && a.ceiling_db == b.ceiling_db;
+}
+
+} // namespace
+
 AudioDecoderFFmpeg::AudioDecoderFFmpeg(FFmpegPaths paths) : paths_(std::move(paths)) {}
 
 Error AudioDecoderFFmpeg::open(const std::string& path, int target_rate, int target_ch) {
@@ -252,6 +271,44 @@ void TimelineAudioPlayback::advance(double dt) {
   if (playing_) time_ += dt;
 }
 
+void TimelineAudioPlayback::sync_track_chains() {
+  if (!session_) return;
+  const auto& tracks = session_->tracks();
+  for (const auto& track : tracks) {
+    auto it = track_chains_.find(track.id);
+    if (it == track_chains_.end()) {
+      if (track.audio_inserts.empty()) continue;
+      it = track_chains_.emplace(track.id, AudioEffectChain{}).first;
+    }
+    AudioEffectChain& chain = it->second;
+    const auto current = chain.parameters();
+    const auto& want = track.audio_inserts;
+    // A structure change (or a kind swap) has to rebuild the chain; anything
+    // else is an in-place parameter edit, which keeps the DSP state alive.
+    bool rebuild = current.size() != want.size();
+    for (size_t i = 0; !rebuild && i < want.size(); ++i)
+      if (current[i].kind != want[i].kind) rebuild = true;
+    if (rebuild) {
+      chain.clear();
+      for (const auto& p : want) chain.add(p);
+      continue;
+    }
+    for (size_t i = 0; i < want.size(); ++i)
+      if (!same_fx(current[i], want[i])) chain.set(i, want[i]);
+  }
+  // Drop chains whose track went away (or whose inserts were cleared), so a
+  // deleted track cannot keep processing stale audio.
+  for (auto it = track_chains_.begin(); it != track_chains_.end();) {
+    bool live = false;
+    for (const auto& track : tracks) {
+      if (track.id != it->first) continue;
+      live = !track.audio_inserts.empty();
+      break;
+    }
+    if (live) ++it; else it = track_chains_.erase(it);
+  }
+}
+
 Error TimelineAudioPlayback::read_pcm(float* interleaved, int frames, int channels) {
   if (!interleaved || frames <= 0)
     return Error::make(ErrorCode::InvalidArgument, "pcm");
@@ -261,6 +318,7 @@ Error TimelineAudioPlayback::read_pcm(float* interleaved, int frames, int channe
 
   const int rate = 48000;
   double win = static_cast<double>(frames) / rate;
+  sync_track_chains();
 
   // Solo on any audible track mutes the rest, the way a mixing desk behaves.
   bool any_solo = false;
@@ -269,6 +327,16 @@ Error TimelineAudioPlayback::read_pcm(float* interleaved, int frames, int channe
   for (const auto& track : session_->tracks()) {
     if (track.muted) continue;
     if (any_solo && !track.solo) continue;
+    // A track with inserts is mixed into its own buffer first, processed, then
+    // summed into the master bus. Tracks without inserts keep the direct path.
+    auto chain_it = track.audio_inserts.empty() ? track_chains_.end()
+                                                : track_chains_.find(track.id);
+    const bool track_fx = chain_it != track_chains_.end();
+    float* mix = interleaved;
+    if (track_fx) {
+      track_scratch_.assign(static_cast<size_t>(frames) * static_cast<size_t>(ch), 0.f);
+      mix = track_scratch_.data();
+    }
     for (const auto& clip : track.clips) {
       if (clip.mute || clip.is_text) continue;
       if (time_ + win < clip.start || time_ >= clip.start + clip.duration) continue;
@@ -307,9 +375,13 @@ Error TimelineAudioPlayback::read_pcm(float* interleaved, int frames, int channe
           float s = 0.f;
           size_t idx = si * src_ch + static_cast<size_t>(std::min(c, src_ch - 1));
           if (idx < pcm.samples.size()) s = pcm.samples[idx];
-          interleaved[i * ch + c] += s * ch_gain[c < 32 ? c : 0];
+          mix[i * ch + c] += s * ch_gain[c < 32 ? c : 0];
         }
       }
+    }
+    if (track_fx) {
+      chain_it->second.process(track_scratch_.data(), static_cast<std::size_t>(frames), rate, ch);
+      for (int i = 0; i < frames * ch; ++i) interleaved[i] += track_scratch_[i];
     }
   }
   // Keep the pre-insert mix bounded, then process the stateful timeline insert
