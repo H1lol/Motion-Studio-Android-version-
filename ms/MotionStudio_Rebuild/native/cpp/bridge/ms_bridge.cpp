@@ -432,6 +432,55 @@ int ms_clip_peaks(int track_id, int clip_id, float* out, int bins) {
     return ms::Engine::instance().clip_peaks(track_id, clip_id, bins, out) ? 0 : -1;
 }
 
+// ---- Clip audio ----------------------------------------------------------
+int ms_clip_audio_set(int track_id, int clip_id, float gain, float pan) {
+    return ms::Engine::instance().set_clip_audio(track_id, clip_id, gain, pan) ? 0 : -1;
+}
+
+int ms_clip_audio_get(int track_id, int clip_id, float* out_gain, float* out_pan) {
+    return ms::Engine::instance().clip_audio(track_id, clip_id, out_gain, out_pan) ? 0 : -1;
+}
+
+int ms_audio_keyframe_add(int track_id, int clip_id, int prop, double time, double value,
+                          int interp) {
+    return ms::Engine::instance().add_audio_keyframe(track_id, clip_id, prop, time, value,
+                                                     interp) ? 0 : -1;
+}
+
+int ms_audio_keyframe_clear(int track_id, int clip_id, int prop) {
+    return ms::Engine::instance().clear_audio_keyframes(track_id, clip_id, prop) ? 0 : -1;
+}
+
+int ms_audio_keyframe_count(int track_id, int clip_id, int prop) {
+    return ms::Engine::instance().audio_keyframe_count(track_id, clip_id, prop);
+}
+
+int ms_audio_keyframe_get(int track_id, int clip_id, int prop, int key, double* out3) {
+    if (!out3) return -1;
+    double time = 0.0, value = 0.0;
+    int interp = 0;
+    if (!ms::Engine::instance().audio_keyframe_at(track_id, clip_id, prop, key, &time, &value,
+                                                  &interp))
+        return -1;
+    out3[0] = time;
+    out3[1] = value;
+    out3[2] = static_cast<double>(interp);
+    return 0;
+}
+
+int ms_audio_keyframe_set(int track_id, int clip_id, int prop, int key, double time,
+                          double value, int interp) {
+    return ms::Engine::instance().set_audio_keyframe(track_id, clip_id, prop, key, time, value,
+                                                     interp) ? 0 : -1;
+}
+
+int ms_audio_keyframe_sample(int track_id, int clip_id, int prop, double t0, double t1,
+                             float* out, int bins) {
+    if (!out) return -1;
+    return ms::Engine::instance().sample_audio_param(track_id, clip_id, prop, t0, t1, out, bins)
+               ? 0 : -1;
+}
+
 int ms_text_set_font_dir(const char* dir) {
     ms::set_text_font_dir(dir ? dir : "");
     return 0;

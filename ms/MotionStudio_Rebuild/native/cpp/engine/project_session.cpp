@@ -444,6 +444,10 @@ std::string ProjectSession::to_json() const {
         }
         ss << "]" << (last ? "" : ", ");
       };
+      // Clip audio automation rides in the clip record next to the transform
+      // curves; older builds ignore the two keys.
+      write_curve("keys_gain", c.gain_curve, false);
+      write_curve("keys_pan", c.pan_curve, false);
       write_curve("keys_opacity", c.motion.opacity, false);
       write_curve("keys_scale", c.motion.scale, false);
       write_curve("keys_pos_x", c.motion.pos_x, false);
@@ -645,6 +649,8 @@ Error ProjectSession::load_from_json(const std::string& json) {
         }
         if (!op.id.empty()) c.motion.effects.push_back(std::move(op));
       }
+      parse_motion_curve(co, "keys_gain", c.gain_curve);
+      parse_motion_curve(co, "keys_pan", c.pan_curve);
       parse_motion_curve(co, "keys_opacity", c.motion.opacity);
       parse_motion_curve(co, "keys_scale", c.motion.scale);
       parse_motion_curve(co, "keys_pos_x", c.motion.pos_x);

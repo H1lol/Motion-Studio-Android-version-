@@ -40,6 +40,12 @@ struct ClipInfo {
   float gain = 1.f;
   float pan = 0.f;
   bool mute = false;
+  // Clip audio automation, in clip-local seconds. `gain_curve` is a multiplier on
+  // the clip's own fader (1 = no change), so a fade is a curve from 0 to 1 and the
+  // slider still trims the whole move. `pan_curve` is an absolute pan position
+  // (-1 left .. +1 right). An empty curve leaves the static value in charge.
+  AnimCurve gain_curve;
+  AnimCurve pan_curve;
   ClipMotion motion;
   // Per-clip grade: exposure, contrast, saturation, temperature, lift, gamma,
   // gain, shadows, highlights, vibrance. Applied per clip before compositing,

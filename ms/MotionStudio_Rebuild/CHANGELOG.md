@@ -1,5 +1,39 @@
 # Changelog
 
+## Unreleased — clip audio and automation
+
+### Added
+- **Per-clip fader and pan.** A clip now carries its own gain (linear, 0–4) and pan
+  (−1 left … +1 right); the timeline mix multiplies the clip fader by the track fader
+  and applies a linear pan law per sample. Before this the mixer honoured both values but
+  nothing in the app could set them
+- **Gain and pan curves.** Either value can be automated in clip-local seconds: the gain
+  curve multiplies the clip's fader (so a fade is 0 → 1 and the fader still trims the
+  whole move) and the pan curve is the absolute position. The mixer resolves the curves
+  per sample, and evaluates nothing while a curve holds no keys, so an un-automated clip
+  costs exactly what it did before
+- **Engine surface.** `set_clip_audio`, `clip_audio`, `add_audio_keyframe`,
+  `clear_audio_keyframes`, `audio_keyframe_count/at/set` and `sample_audio_param`. Adding
+  a key at an instant that already holds one replaces it, matching effect automation;
+  structure and value edits are undoable
+- **Persistence.** `keys_gain` and `keys_pan` sit beside the transform curves in the clip
+  record, so automation survives save, load and undo. Older builds ignore the two keys
+- **UI.** `MIX` gains a **CLIP AUDIO** section listing every non-text clip with GAIN and
+  PAN sliders, **◆ GAIN** / **◆ PAN** keys at the playhead, and a key count that clears
+  the curve when tapped
+
+### Verified
+- `ms_edit_test`: fader and pan round-trip, an unknown clip is rejected, a same-instant
+  key replaces instead of stacking, the pan curve interpolates to ±1 at its ends, both
+  curves and the fader survive a save/load round trip, clearing one curve leaves the
+  other alone, and an out-of-range property is rejected
+- `bridge/ms_bridge.cpp` compiles clean under `-fsyntax-only`. Kotlin/JNI and Compose were
+  not compiled here (no Android toolchain in this environment)
+
+### Provenance
+- Original work: the mixer's own gain/pan stage and `AnimCurve` evaluation, no external
+  automation code
+
 ## Unreleased — per-track insert chains
 
 ### Added

@@ -490,6 +490,51 @@ int main() {
         check(e.track_insert_count(track) == 0, "track chain cleared");
     }
 
+    // Clip audio: fader/pan and their automation curves, saved with the clip.
+    {
+        check(e.set_clip_audio(track, clip, 0.8f, -0.25f), "clip audio set");
+        float cg = 0.f, cp = 0.f;
+        check(e.clip_audio(track, clip, &cg, &cp), "clip audio readable");
+        check(std::fabs(cg - 0.8f) < 1e-4f && std::fabs(cp + 0.25f) < 1e-4f,
+              "clip audio values");
+        float bad_gain = -1.f;
+        check(!e.clip_audio(track, 9999, &bad_gain, nullptr), "unknown clip audio rejected");
+
+        check(e.add_audio_keyframe(track, clip, 0, 0.0, 0.0), "gain key added");
+        check(e.add_audio_keyframe(track, clip, 0, 1.5, 1.0, 3), "gain key 2 added");
+        // The same instant replaces: tapping the key button twice must not stack.
+        check(e.add_audio_keyframe(track, clip, 0, 1.5, 0.6, 0), "gain key replaced in place");
+        check(e.audio_keyframe_count(track, clip, 0) == 2, "gain keys counted");
+        double kt = -1.0, kv = -1.0;
+        int ki = -1;
+        check(e.audio_keyframe_at(track, clip, 0, 1, &kt, &kv, &ki), "gain key reads back");
+        check(std::fabs(kt - 1.5) < 1e-6 && std::fabs(kv - 0.6) < 1e-6 && ki == 0,
+              "replaced gain key values");
+        check(e.add_audio_keyframe(track, clip, 1, 0.0, -1.0), "pan key added");
+        check(e.add_audio_keyframe(track, clip, 1, 2.0, 1.0), "pan key 2 added");
+
+        float samples[3] = {};
+        check(e.sample_audio_param(track, clip, 1, 0.0, 2.0, samples, 3), "pan curve sampled");
+        check(std::fabs(samples[0] + 1.f) < 1e-4f && std::fabs(samples[1]) < 1e-4f &&
+                  std::fabs(samples[2] - 1.f) < 1e-4f,
+              "pan curve interpolates");
+
+        const std::string aj = e.project_to_json();
+        check(aj.find("\"keys_gain\"") != std::string::npos, "gain curve serialized");
+        check(e.load_project_json(aj), "reload with clip automation");
+        check(e.audio_keyframe_count(track, clip, 0) == 2, "gain keys restored");
+        check(e.audio_keyframe_count(track, clip, 1) == 2, "pan keys restored");
+        float rg = 0.f, rp = 0.f;
+        check(e.clip_audio(track, clip, &rg, &rp), "clip audio restored");
+        check(std::fabs(rg - 0.8f) < 1e-4f && std::fabs(rp + 0.25f) < 1e-4f,
+              "clip fader and pan restored");
+
+        check(e.clear_audio_keyframes(track, clip, 0), "gain curve cleared");
+        check(e.audio_keyframe_count(track, clip, 0) == 0, "gain curve empty after clear");
+        check(e.audio_keyframe_count(track, clip, 1) == 2, "pan curve untouched");
+        check(e.add_audio_keyframe(track, clip, 2, 0.0, 0.0) == false, "bad audio prop rejected");
+    }
+
     // Keyframe curves: read-back, interpolation modes and a save/load round trip.
     {
         check(e.add_keyframe(track, clip, 0, 0.0, 0.0), "curve: key 0 added");

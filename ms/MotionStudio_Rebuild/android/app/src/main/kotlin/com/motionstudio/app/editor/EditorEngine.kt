@@ -1673,6 +1673,58 @@ class EditorEngine(
         return ok
     }
 
+    // ---- Clip audio and automation -----------------------------------------
+
+    /** Clip fader and pan, or null when the clip is unknown. */
+    fun clipAudio(trackId: Int, clipId: Int): Pair<Float, Float>? {
+        val out = FloatArray(2)
+        if (!NativeEngine.nativeClipAudioGet(trackId, clipId, out)) return null
+        return out[0] to out[1]
+    }
+
+    fun setClipAudio(trackId: Int, clipId: Int, gain: Float, pan: Float): Boolean {
+        val ok = NativeEngine.nativeClipAudioSet(trackId, clipId, gain, pan)
+        if (ok) {
+            markDirty()
+            reload()
+        }
+        return ok
+    }
+
+    /**
+     * Keys a clip audio value at the playhead. prop 0 is the gain multiplier, 1
+     * the pan; both are clip-local seconds inside the engine, so a clip moved on
+     * the timeline keeps its automation attached.
+     */
+    fun addClipAudioKeyframe(trackId: Int, clipId: Int, prop: Int, value: Double): Boolean {
+        val clip = doc.tracks.firstOrNull { it.id == trackId }
+            ?.clips?.firstOrNull { it.id == clipId } ?: return false
+        val local = time - clip.start
+        if (local < 0.0) {
+            status = "Playhead is before the clip"
+            return false
+        }
+        val ok = NativeEngine.nativeAudioKeyframeAdd(trackId, clipId, prop, local, value, 0)
+        if (ok) {
+            status = if (prop == 0) "Gain key added" else "Pan key added"
+            markDirty()
+            reload()
+        }
+        return ok
+    }
+
+    fun clearClipAudioKeyframes(trackId: Int, clipId: Int, prop: Int): Boolean {
+        val ok = NativeEngine.nativeAudioKeyframeClear(trackId, clipId, prop)
+        if (ok) {
+            markDirty()
+            reload()
+        }
+        return ok
+    }
+
+    fun clipAudioKeyframeCount(trackId: Int, clipId: Int, prop: Int): Int =
+        NativeEngine.nativeAudioKeyframeCount(trackId, clipId, prop)
+
     fun setTrackGain(trackId: Int, gain: Float): Boolean {
         val ok = NativeEngine.nativeTrackGain(trackId, gain)
         if (ok) {

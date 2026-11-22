@@ -328,6 +328,74 @@ Java_com_motionstudio_app_native_NativeEngine_nativeTrackFxGetParam(JNIEnv* env,
     return value;
 }
 
+// ---- Clip audio ----------------------------------------------------------
+JNIEXPORT jboolean JNICALL
+Java_com_motionstudio_app_native_NativeEngine_nativeClipAudioSet(
+        JNIEnv*, jobject, jint track, jint clip, jfloat gain, jfloat pan) {
+    return ms_clip_audio_set(track, clip, gain, pan) == 0 ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_motionstudio_app_native_NativeEngine_nativeClipAudioGet(
+        JNIEnv* env, jobject, jint track, jint clip, jfloatArray out) {
+    if (!out || env->GetArrayLength(out) < 2) return JNI_FALSE;
+    float g = 1.f, p = 0.f;
+    if (ms_clip_audio_get(track, clip, &g, &p) != 0) return JNI_FALSE;
+    const jfloat values[2] = {g, p};
+    env->SetFloatArrayRegion(out, 0, 2, values);
+    return JNI_TRUE;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_motionstudio_app_native_NativeEngine_nativeAudioKeyframeAdd(
+        JNIEnv*, jobject, jint track, jint clip, jint prop, jdouble time, jdouble value,
+        jint interp) {
+    return ms_audio_keyframe_add(track, clip, prop, time, value, interp) == 0 ? JNI_TRUE
+                                                                             : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_motionstudio_app_native_NativeEngine_nativeAudioKeyframeClear(
+        JNIEnv*, jobject, jint track, jint clip, jint prop) {
+    return ms_audio_keyframe_clear(track, clip, prop) == 0 ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_motionstudio_app_native_NativeEngine_nativeAudioKeyframeCount(
+        JNIEnv*, jobject, jint track, jint clip, jint prop) {
+    return ms_audio_keyframe_count(track, clip, prop);
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_motionstudio_app_native_NativeEngine_nativeAudioKeyframeGet(
+        JNIEnv* env, jobject, jint track, jint clip, jint prop, jint key, jdoubleArray out) {
+    if (!out || env->GetArrayLength(out) < 3) return JNI_FALSE;
+    double values[3] = {0.0, 0.0, 0.0};
+    if (ms_audio_keyframe_get(track, clip, prop, key, values) != 0) return JNI_FALSE;
+    env->SetDoubleArrayRegion(out, 0, 3, values);
+    return JNI_TRUE;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_motionstudio_app_native_NativeEngine_nativeAudioKeyframeSet(
+        JNIEnv*, jobject, jint track, jint clip, jint prop, jint key, jdouble time,
+        jdouble value, jint interp) {
+    return ms_audio_keyframe_set(track, clip, prop, key, time, value, interp) == 0 ? JNI_TRUE
+                                                                                  : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_motionstudio_app_native_NativeEngine_nativeAudioKeyframeSample(
+        JNIEnv* env, jobject, jint track, jint clip, jint prop, jdouble t0, jdouble t1,
+        jfloatArray out, jint bins) {
+    if (!out || bins < 2 || env->GetArrayLength(out) < bins) return JNI_FALSE;
+    std::vector<float> tmp(static_cast<size_t>(bins), 0.f);
+    if (ms_audio_keyframe_sample(track, clip, prop, t0, t1, tmp.data(), bins) != 0)
+        return JNI_FALSE;
+    env->SetFloatArrayRegion(out, 0, bins, tmp.data());
+    return JNI_TRUE;
+}
+
 JNIEXPORT jboolean JNICALL
 Java_com_motionstudio_app_native_NativeEngine_nativeLookLoad(JNIEnv* env, jobject, jstring path) {
     if (!path) return JNI_FALSE;

@@ -248,6 +248,26 @@ int ms_clip_grade_tonal_set(int track_id, int clip_id, float shadows, float high
 // success, -1 when the clip has no decodable audio (text clips, silent media).
 int ms_clip_peaks(int track_id, int clip_id, float* out, int bins);
 
+// ---- Clip audio ----------------------------------------------------------
+// The clip fader multiplies the track fader in the timeline mix; pan is -1 left
+// to +1 right. Both are saved with the clip.
+int ms_clip_audio_set(int track_id, int clip_id, float gain, float pan);
+int ms_clip_audio_get(int track_id, int clip_id, float* out_gain, float* out_pan);
+
+// ---- Clip audio automation ----------------------------------------------
+// prop: 0 gain (a multiplier on the fader), 1 pan (absolute). Times and samples
+// are clip-local seconds. Times may be written as [time, value, interp].
+int ms_audio_keyframe_add(int track_id, int clip_id, int prop, double time, double value,
+                          int interp);
+int ms_audio_keyframe_clear(int track_id, int clip_id, int prop);
+int ms_audio_keyframe_count(int track_id, int clip_id, int prop);
+/** Fills out3 with time, value, interpolation. */
+int ms_audio_keyframe_get(int track_id, int clip_id, int prop, int key, double* out3);
+int ms_audio_keyframe_set(int track_id, int clip_id, int prop, int key, double time,
+                          double value, int interp);
+int ms_audio_keyframe_sample(int track_id, int clip_id, int prop, double t0, double t1,
+                             float* out, int bins);
+
 // ---- Text / titles ----
 // Points the native rasteriser at the directory holding <family>.ttf files
 // (host extracts them from assets once). Returns 0 on success.

@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.sp
 import com.motionstudio.app.editor.AUDIO_INSERT_NAMES
 import com.motionstudio.app.editor.AudioInsert
 import com.motionstudio.app.editor.EditorEngine
+import com.motionstudio.app.model.NativeClip
 import com.motionstudio.app.model.NativeTrack
 import com.motionstudio.app.ui.theme.MsColors
 import com.motionstudio.app.ui.theme.MsFonts
@@ -200,6 +201,24 @@ fun AudioSheet(engine: EditorEngine, onDismiss: () -> Unit) {
                     }
                 }
                 items(tracks) { track -> TrackStrip(engine, track, revision, drafts) }
+
+                item { SectionLabel("CLIP AUDIO") }
+                val clips = tracks.flatMap { track ->
+                    track.clips.filter { !it.isText }.map { track to it }
+                }
+                if (clips.isEmpty()) {
+                    item {
+                        Text(
+                            "No clips to mix yet.",
+                            color = MsColors.textMuted,
+                            fontSize = 11.sp,
+                            modifier = Modifier.padding(vertical = 6.dp),
+                        )
+                    }
+                }
+                items(clips) { (track, clip) ->
+                    ClipAudioRow(engine, track, clip, revision, drafts)
+                }
             }
             Spacer(Modifier.height(20.dp))
         }
@@ -385,6 +404,118 @@ private fun TrackStrip(
             }
         }
     }
+}
+
+@Composable
+private fun ClipAudioRow(
+    engine: EditorEngine,
+    track: NativeTrack,
+    clip: NativeClip,
+    revision: Int,
+    drafts: MutableMap<String, Float>,
+) {
+    val audio = remember(revision, clip.id) { engine.clipAudio(track.id, clip.id) } ?: return
+    val gainKey = "c${clip.id}:gain"
+    val panKey = "c${clip.id}:pan"
+    val gain = drafts[gainKey] ?: audio.first
+    val pan = drafts[panKey] ?: audio.second
+    val gainKeys = remember(revision, clip.id) {
+        engine.clipAudioKeyframeCount(track.id, clip.id, 0)
+    }
+    val panKeys = remember(revision, clip.id) {
+        engine.clipAudioKeyframeCount(track.id, clip.id, 1)
+    }
+    Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(clip.name, color = MsColors.textPrimary, fontSize = 13.sp)
+                Text(
+                    "${track.name.uppercase()} · ${clip.start.seconds()}–${clip.end.seconds()}",
+                    color = MsColors.textMuted,
+                    fontSize = 9.sp,
+                    fontFamily = MsFonts.mono,
+                )
+            }
+            MiniChip("◆ GAIN", gainKeys > 0) {
+                engine.addClipAudioKeyframe(track.id, clip.id, 0, gain.toDouble())
+            }
+            MiniChip("◆ PAN", panKeys > 0) {
+                engine.addClipAudioKeyframe(track.id, clip.id, 1, pan.toDouble())
+            }
+            if (gainKeys > 0) {
+                MiniChip("G $gainKeys ✕", false) {
+                    engine.clearClipAudioKeyframes(track.id, clip.id, 0)
+                }
+            }
+            if (panKeys > 0) {
+                MiniChip("P $panKeys ✕", false) {
+                    engine.clearClipAudioKeyframes(track.id, clip.id, 1)
+                }
+            }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "GAIN",
+                color = MsColors.textSecondary,
+                fontSize = 10.sp,
+                fontFamily = MsFonts.mono,
+                modifier = Modifier.fillMaxWidth(0.30f),
+            )
+            Slider(
+                value = gain.coerceIn(0f, 2f),
+                onValueChange = {
+                    drafts[gainKey] = it
+                    engine.setClipAudio(track.id, clip.id, it, pan)
+                },
+                valueRange = 0f..2f,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                if (gain <= 0.0001f) "-inf" else "%.1f dB".format(20.0 * log10(gain.toDouble())),
+                color = MsColors.textTertiary,
+                fontSize = 9.sp,
+                fontFamily = MsFonts.mono,
+                modifier = Modifier.padding(start = 6.dp),
+            )
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "PAN",
+                color = MsColors.textSecondary,
+                fontSize = 10.sp,
+                fontFamily = MsFonts.mono,
+                modifier = Modifier.fillMaxWidth(0.30f),
+            )
+            Slider(
+                value = pan.coerceIn(-1f, 1f),
+                onValueChange = {
+                    drafts[panKey] = it
+                    engine.setClipAudio(track.id, clip.id, gain, it)
+                },
+                valueRange = -1f..1f,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                when {
+                    pan < -0.01f -> "L %.0f".format(-pan * 100)
+                    pan > 0.01f -> "R %.0f".format(pan * 100)
+                    else -> "C"
+                },
+                color = MsColors.textTertiary,
+                fontSize = 9.sp,
+                fontFamily = MsFonts.mono,
+                modifier = Modifier.padding(start = 6.dp),
+            )
+        }
+    }
+}
+
+/** MM:SS.mmm, so two clips on the same second are still distinguishable. */
+private fun Double.seconds(): String {
+    val total = if (this < 0) 0.0 else this
+    val minutes = (total / 60).toInt()
+    val secs = total - minutes * 60
+    return "%d:%06.3f".format(minutes, secs)
 }
 
 @Composable

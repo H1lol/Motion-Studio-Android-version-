@@ -128,6 +128,45 @@ object NativeEngine {
     external fun nativeTrackFxSetParam(trackId: Int, index: Int, name: String, value: Float): Boolean
     external fun nativeTrackFxGetParam(trackId: Int, index: Int, name: String, fallback: Float): Float
 
+    // Clip audio and its automation (prop 0 gain, 1 pan; clip-local seconds)
+    external fun nativeClipAudioSet(trackId: Int, clipId: Int, gain: Float, pan: Float): Boolean
+    external fun nativeClipAudioGet(trackId: Int, clipId: Int, out: FloatArray): Boolean
+    external fun nativeAudioKeyframeAdd(
+        trackId: Int,
+        clipId: Int,
+        prop: Int,
+        time: Double,
+        value: Double,
+        interp: Int,
+    ): Boolean
+    external fun nativeAudioKeyframeClear(trackId: Int, clipId: Int, prop: Int): Boolean
+    external fun nativeAudioKeyframeCount(trackId: Int, clipId: Int, prop: Int): Int
+    external fun nativeAudioKeyframeGet(
+        trackId: Int,
+        clipId: Int,
+        prop: Int,
+        key: Int,
+        out: DoubleArray,
+    ): Boolean
+    external fun nativeAudioKeyframeSet(
+        trackId: Int,
+        clipId: Int,
+        prop: Int,
+        key: Int,
+        time: Double,
+        value: Double,
+        interp: Int,
+    ): Boolean
+    external fun nativeAudioKeyframeSample(
+        trackId: Int,
+        clipId: Int,
+        prop: Int,
+        t0: Double,
+        t1: Double,
+        out: FloatArray,
+        bins: Int,
+    ): Boolean
+
     // Master grade + scopes
     external fun nativeGradeSet(
         exposure: Float,

@@ -142,6 +142,30 @@ public:
     /** Track fader (linear, 1 = unity). Heard in the timeline audio mix. */
     bool set_track_gain(TrackId track, float gain);
 
+    // ---- Clip audio -------------------------------------------------------
+    /** Clip fader (linear) and pan (-1 left .. +1 right). Undoable, mix-only. */
+    bool set_clip_audio(TrackId track, ClipId clip, float gain, float pan);
+    /** Reads the clip's fader and pan; false when the clip is unknown. */
+    bool clip_audio(TrackId track, ClipId clip, float* gain, float* pan) const;
+
+    // ---- Clip audio automation -------------------------------------------
+    // prop: 0 gain, 1 pan. Times are clip-local seconds, like the transform
+    // keys. The gain curve is a multiplier on the clip's fader (a fade is 0 to 1
+    // and the fader still trims it); the pan curve is the absolute position.
+    // Adding a key at a time that already holds one replaces it rather than
+    // stacking a duplicate.
+    bool add_audio_keyframe(TrackId track, ClipId clip, int prop, TimeSec time,
+                            double value, int interp = 0);
+    bool clear_audio_keyframes(TrackId track, ClipId clip, int prop);
+    int  audio_keyframe_count(TrackId track, ClipId clip, int prop) const;
+    bool audio_keyframe_at(TrackId track, ClipId clip, int prop, int key, double* time,
+                           double* value, int* interp) const;
+    bool set_audio_keyframe(TrackId track, ClipId clip, int prop, int key, double time,
+                            double value, int interp);
+    /** Fills `bins` samples of one clip-local audio curve over [t0, t1]. */
+    bool sample_audio_param(TrackId track, ClipId clip, int prop, double t0, double t1,
+                            float* out, int bins) const;
+
     // Clip effect stack (index = position in the clip's stack).
     int  add_effect(TrackId track, ClipId clip, const std::string& base_id);
     bool remove_effect(TrackId track, ClipId clip, int index);

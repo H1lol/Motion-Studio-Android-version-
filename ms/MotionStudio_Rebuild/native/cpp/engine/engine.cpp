@@ -496,6 +496,172 @@ bool Engine::track_insert_params(TrackId track, int index, AudioFxParams* out) c
     return true;
 }
 
+namespace {
+
+/** Curve slot for a clip audio property: 0 gain, 1 pan. */
+AnimCurve* audio_curve_for(ClipInfo& c, int prop) {
+    switch (prop) {
+        case 0: return &c.gain_curve;
+        case 1: return &c.pan_curve;
+        default: return nullptr;
+    }
+}
+
+const AnimCurve* audio_curve_for(const ClipInfo& c, int prop) {
+    switch (prop) {
+        case 0: return &c.gain_curve;
+        case 1: return &c.pan_curve;
+        default: return nullptr;
+    }
+}
+
+} // namespace
+
+bool Engine::set_clip_audio(TrackId track, ClipId clip, float gain, float pan) {
+    if (!project_) return false;
+    TrackInfo* t = project_->find_track(track);
+    if (!t) return false;
+    for (auto& c : t->clips) {
+        if (c.id != clip) continue;
+        project_->push_undo();
+        c.gain = std::clamp(gain, 0.f, 4.f);
+        c.pan = std::clamp(pan, -1.f, 1.f);
+        project_->mark_dirty();
+        return true;
+    }
+    return false;
+}
+
+bool Engine::clip_audio(TrackId track, ClipId clip, float* gain, float* pan) const {
+    if (!project_) return false;
+    for (const auto& t : project_->tracks()) {
+        if (t.id != track) continue;
+        for (const auto& c : t.clips) {
+            if (c.id != clip) continue;
+            if (gain) *gain = c.gain;
+            if (pan) *pan = c.pan;
+            return true;
+        }
+    }
+    return false;
+}
+
+bool Engine::add_audio_keyframe(TrackId track, ClipId clip, int prop, TimeSec time,
+                                double value, int interp) {
+    if (!project_ || prop < 0 || prop > 1 || interp < 0 || interp > 5) return false;
+    TrackInfo* t = project_->find_track(track);
+    if (!t) return false;
+    for (auto& c : t->clips) {
+        if (c.id != clip) continue;
+        AnimCurve* curve = audio_curve_for(c, prop);
+        if (!curve) return false;
+        project_->push_undo();
+        const double at = std::max<TimeSec>(0.0, time);
+        // Same instant: retime/revalue instead of stacking a duplicate key.
+        const auto& keys = curve->keys();
+        bool replaced = false;
+        for (size_t i = 0; i < keys.size(); ++i) {
+            if (std::fabs(keys[i].time - at) > 1e-6) continue;
+            curve->set_key(i, at, value);
+            curve->set_interp(i, static_cast<CurveInterp>(interp));
+            replaced = true;
+            break;
+        }
+        if (!replaced) curve->add(at, value, static_cast<CurveInterp>(interp));
+        project_->mark_dirty();
+        return true;
+    }
+    return false;
+}
+
+bool Engine::clear_audio_keyframes(TrackId track, ClipId clip, int prop) {
+    if (!project_ || prop < 0 || prop > 1) return false;
+    TrackInfo* t = project_->find_track(track);
+    if (!t) return false;
+    for (auto& c : t->clips) {
+        if (c.id != clip) continue;
+        AnimCurve* curve = audio_curve_for(c, prop);
+        if (!curve) return false;
+        project_->push_undo();
+        curve->clear();
+        project_->mark_dirty();
+        return true;
+    }
+    return false;
+}
+
+int Engine::audio_keyframe_count(TrackId track, ClipId clip, int prop) const {
+    if (!project_ || prop < 0 || prop > 1) return 0;
+    for (const auto& t : project_->tracks()) {
+        if (t.id != track) continue;
+        for (const auto& c : t.clips) {
+            if (c.id != clip) continue;
+            const AnimCurve* curve = audio_curve_for(c, prop);
+            return curve ? static_cast<int>(curve->keys().size()) : 0;
+        }
+    }
+    return 0;
+}
+
+bool Engine::audio_keyframe_at(TrackId track, ClipId clip, int prop, int key, double* time,
+                               double* value, int* interp) const {
+    if (!project_ || prop < 0 || prop > 1 || key < 0) return false;
+    for (const auto& t : project_->tracks()) {
+        if (t.id != track) continue;
+        for (const auto& c : t.clips) {
+            if (c.id != clip) continue;
+            const AnimCurve* curve = audio_curve_for(c, prop);
+            if (!curve) return false;
+            const AnimKeyframe* k = curve->at(static_cast<size_t>(key));
+            if (!k) return false;
+            if (time) *time = k->time;
+            if (value) *value = k->value;
+            if (interp) *interp = static_cast<int>(k->interp);
+            return true;
+        }
+    }
+    return false;
+}
+
+bool Engine::set_audio_keyframe(TrackId track, ClipId clip, int prop, int key, double time,
+                                double value, int interp) {
+    if (!project_ || prop < 0 || prop > 1 || key < 0 || interp < 0 || interp > 5) return false;
+    TrackInfo* t = project_->find_track(track);
+    if (!t) return false;
+    for (auto& c : t->clips) {
+        if (c.id != clip) continue;
+        AnimCurve* curve = audio_curve_for(c, prop);
+        if (!curve) return false;
+        project_->push_undo();
+        if (!curve->set_key(static_cast<size_t>(key), time, value)) return false;
+        curve->set_interp(static_cast<size_t>(key), static_cast<CurveInterp>(interp));
+        project_->mark_dirty();
+        return true;
+    }
+    return false;
+}
+
+bool Engine::sample_audio_param(TrackId track, ClipId clip, int prop, double t0, double t1,
+                                float* out, int bins) const {
+    if (!project_ || prop < 0 || prop > 1 || !out || bins < 2) return false;
+    for (const auto& t : project_->tracks()) {
+        if (t.id != track) continue;
+        for (const auto& c : t.clips) {
+            if (c.id != clip) continue;
+            const AnimCurve* curve = audio_curve_for(c, prop);
+            if (!curve) return false;
+            const double span = (t1 > t0) ? (t1 - t0) : 1e-6;
+            for (int i = 0; i < bins; ++i) {
+                const double tt = t0 + span * static_cast<double>(i) /
+                                           static_cast<double>(bins - 1);
+                out[i] = static_cast<float>(curve->eval(tt));
+            }
+            return true;
+        }
+    }
+    return false;
+}
+
 bool Engine::set_effect_param(EffectId effect, const std::string& name, float value) {
     (void)effect; (void)name; (void)value;
     // Effect IDs are intentionally lightweight in the first native API. Parameters are stored by name in EffectOp.

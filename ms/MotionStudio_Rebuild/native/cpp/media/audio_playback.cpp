@@ -359,6 +359,11 @@ Error TimelineAudioPlayback::read_pcm(float* interleaved, int frames, int channe
       // clip.opacity, which meant the mixer never heard a clip's own gain.
       const float clip_gain = std::clamp(clip.gain * track.gain, 0.f, 4.f);
       const float pan = std::clamp(clip.pan, -1.f, 1.f);
+      // A curve in either direction means the channel gains have to be worked out
+      // per sample; a static clip keeps one set of gains for the whole block.
+      const bool auto_gain = !clip.gain_curve.empty();
+      const bool auto_pan = !clip.pan_curve.empty();
+      const bool animated = auto_gain || auto_pan;
       float ch_gain[32];
       for (int c = 0; c < ch && c < 32; ++c) {
         if (ch == 1) ch_gain[c] = clip_gain;
@@ -369,8 +374,22 @@ Error TimelineAudioPlayback::read_pcm(float* interleaved, int frames, int channe
       for (int i = 0; i < frames; ++i) {
         double t = time_ + static_cast<double>(i) / rate;
         if (t < clip.start || t >= clip.start + clip.duration) continue;
-        double local = (t - clip.start) * clip.speed + clip.source_in;
+        const double clip_local = t - clip.start;
+        double local = clip_local * clip.speed + clip.source_in;
         size_t si = static_cast<size_t>(local * src_rate);
+        if (animated) {
+          float g = clip_gain;
+          float p = pan;
+          if (auto_gain)
+            g = std::clamp(clip_gain * static_cast<float>(clip.gain_curve.eval(clip_local)),
+                           0.f, 4.f);
+          if (auto_pan)
+            p = std::clamp(static_cast<float>(clip.pan_curve.eval(clip_local)), -1.f, 1.f);
+          for (int c = 0; c < ch && c < 32; ++c) {
+            if (ch == 1) ch_gain[c] = g;
+            else ch_gain[c] = g * (c == 0 ? 1.f - std::max(0.f, p) : 1.f + std::min(0.f, p));
+          }
+        }
         for (int c = 0; c < ch; ++c) {
           float s = 0.f;
           size_t idx = si * src_ch + static_cast<size_t>(std::min(c, src_ch - 1));
