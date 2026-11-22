@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -236,18 +237,26 @@ fun EffectsSheet(engine: EditorEngine, onDismiss: () -> Unit) {
         sheetState = sheetState,
         containerColor = MsColors.surface,
     ) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
-            Text("Effects", color = MsColors.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(2.dp))
-            Text(
-                if (clipName != null) "On “$clipName” · rendered by the C++ effect stack"
-                else "Select a clip to add effects",
-                color = MsColors.textTertiary,
-                fontSize = 12.sp,
+        // fillMaxHeight + weight instead of a 430 dp list: the old fixed height
+        // was cut in half on a landscape phone and left a gap on a tablet.
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.92f)
+                .padding(horizontal = 20.dp)
+        ) {
+            SheetHeader(
+                title = "Effects",
+                subtitle = if (clipName != null) {
+                    "On “$clipName” · rendered by the C++ effect stack"
+                } else {
+                    "Select a clip to add effects"
+                },
+                onDismiss = onDismiss,
             )
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(8.dp))
 
-            LazyColumn(Modifier.fillMaxWidth().height(430.dp)) {
+            LazyColumn(Modifier.fillMaxWidth().weight(1f)) {
                 if (clipName != null) {
                     item {
                         Row(

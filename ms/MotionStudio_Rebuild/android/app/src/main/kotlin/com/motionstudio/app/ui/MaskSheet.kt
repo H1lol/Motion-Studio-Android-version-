@@ -3,6 +3,7 @@ package com.motionstudio.app.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -90,23 +92,27 @@ fun MaskSheet(engine: EditorEngine, onDismiss: () -> Unit) {
                 .padding(horizontal = 20.dp)
                 .padding(bottom = 24.dp),
         ) {
-            Text("Masks", color = MsColors.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-            Text(
-                when {
+            SheetHeader(
+                title = "Masks",
+                subtitle = when {
                     engine.selectedClipId < 0 -> "Select a clip to mask it"
                     masks.isEmpty() -> "No masks on the selected clip"
                     masks.size == 1 -> "1 mask on the selected clip"
                     else -> "${masks.size} masks on the selected clip"
                 },
-                color = if (masks.isEmpty()) MsColors.textTertiary else MsColors.success,
-                fontSize = 11.sp,
+                onDismiss = onDismiss,
             )
 
             Spacer(Modifier.height(10.dp))
 
             // Mask list. Each chip selects a mask; the glyph says whether it
             // adds to or subtracts from the matte.
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            // Eight masks plus the add chip overflowed the sheet on a phone; the
+            // strip scrolls so the last mask is still reachable.
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
                 masks.forEachIndexed { i, m ->
                     val selected = i == index
                     MaskChip(
@@ -139,13 +145,19 @@ fun MaskSheet(engine: EditorEngine, onDismiss: () -> Unit) {
 
             if (current != null) {
                 Spacer(Modifier.height(6.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
                     MaskChip("Add", op == 0, onClick = { op = 0; push() })
                     MaskChip("Subtract", op == 1, onClick = { op = 1; push() })
                 }
 
                 Spacer(Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
                     listOf("Rect" to 0, "Ellipse" to 1, "Full" to 2).forEach { (label, value) ->
                         MaskChip(label, shape == value, onClick = { shape = value; push() })
                     }
@@ -161,7 +173,10 @@ fun MaskSheet(engine: EditorEngine, onDismiss: () -> Unit) {
                 // ◆ keys the current value at the playhead; a keyed chip shows
                 // its key count and clears that curve when tapped.
                 var keyRevision by remember { mutableIntStateOf(0) }
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
                     listOf(
                         Triple("X", 0, x),
                         Triple("Y", 1, y),
@@ -255,6 +270,7 @@ private fun MaskChip(
 ) {
     Box(
         Modifier
+            .heightIn(min = 38.dp)
             .background(
                 if (selected) MsColors.accentSoft.copy(alpha = 0.16f) else MsColors.surfaceHigh,
                 RoundedCornerShape(8.dp),
@@ -265,7 +281,8 @@ private fun MaskChip(
                 RoundedCornerShape(8.dp),
             )
             .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 8.dp),
+            .padding(horizontal = 14.dp, vertical = 9.dp),
+        contentAlignment = Alignment.Center,
     ) {
         Text(
             label,

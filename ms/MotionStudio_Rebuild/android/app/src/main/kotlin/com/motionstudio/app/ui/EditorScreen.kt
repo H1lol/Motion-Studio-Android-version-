@@ -2,6 +2,7 @@ package com.motionstudio.app.ui
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -56,6 +57,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -350,10 +352,12 @@ private fun EditorHeader(
             }
             Box(
                 Modifier
-                    .clip(RoundedCornerShape(10.dp))
+                    .height(34.dp)
+                    .clip(RoundedCornerShape(9.dp))
                     .background(MsColors.accent)
                     .clickable { onExport() }
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(horizontal = 16.dp),
+                contentAlignment = Alignment.Center,
             ) {
                 Text(
                     "Export",
@@ -370,7 +374,7 @@ private fun EditorHeader(
 @Composable
 private fun WorkspaceTabs(selected: Workspace, onSelect: (Workspace) -> Unit) {
     Row(
-        Modifier.fillMaxWidth().height(32.dp).background(MsColors.surface)
+        Modifier.fillMaxWidth().height(42.dp).background(MsColors.surface)
             .horizontalScroll(rememberScrollState()),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -378,14 +382,16 @@ private fun WorkspaceTabs(selected: Workspace, onSelect: (Workspace) -> Unit) {
             val active = tab == selected
             Column(
                 Modifier
+                    .height(42.dp)
                     .clickable { onSelect(tab) }
-                    .padding(horizontal = 14.dp, vertical = 6.dp),
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
             ) {
                 Text(
                     tab.label,
-                    color = if (active) MsColors.textPrimary else MsColors.textMuted,
-                    fontSize = 10.sp,
+                    color = if (active) MsColors.textPrimary else MsColors.textTertiary,
+                    fontSize = 11.sp,
                     fontFamily = MsFonts.mono,
                     fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
                 )
@@ -410,14 +416,23 @@ private fun Viewport(engine: EditorEngine, modifier: Modifier = Modifier) {
                 factory = { context -> PreviewView(context).also { it.attach(engine) } },
                 modifier = Modifier.fillMaxSize(),
             )
-            // Safe-area guides: an inset rule plus centre cross, the standard
-            // framing overlay in a compositor viewport.
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 26.dp, vertical = 18.dp)
-                    .border(1.dp, MsColors.guide.copy(alpha = 0.55f))
-            )
+            // Framing marks, not a box: four corner rules say where the canvas
+            // edge is without drawing a rectangle across the picture you are
+            // judging. The previous full-inset border read as a stray selection.
+            Canvas(
+                Modifier.fillMaxSize().padding(horizontal = 22.dp, vertical = 14.dp)
+            ) {
+                val arm = 16.dp.toPx()
+                val ink = MsColors.guideStrong.copy(alpha = 0.45f)
+                fun corner(x: Float, y: Float, dx: Float, dy: Float) {
+                    drawLine(ink, Offset(x, y), Offset(x + dx * arm, y), 1f)
+                    drawLine(ink, Offset(x, y), Offset(x, y + dy * arm), 1f)
+                }
+                corner(0f, 0f, 1f, 1f)
+                corner(size.width, 0f, -1f, 1f)
+                corner(0f, size.height, 1f, -1f)
+                corner(size.width, size.height, -1f, -1f)
+            }
             Box(
                 Modifier
                     .align(Alignment.TopStart)

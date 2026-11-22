@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -25,6 +26,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -38,14 +40,14 @@ import com.motionstudio.app.ui.theme.MsFonts
 @Composable
 fun PanelHeader(title: String, trailing: String? = null) {
     Row(
-        Modifier.fillMaxWidth().height(26.dp).background(MsColors.surfaceHigh)
-            .padding(horizontal = 10.dp),
+        Modifier.fillMaxWidth().height(32.dp).background(MsColors.surfaceHigh)
+            .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             title,
-            color = MsColors.textMuted,
-            fontSize = 9.sp,
+            color = MsColors.textTertiary,
+            fontSize = 10.sp,
             fontFamily = MsFonts.mono,
             letterSpacing = 1.sp,
         )
@@ -67,9 +69,9 @@ private fun ParamRow(
         Text(
             label.uppercase(),
             color = MsColors.textTertiary,
-            fontSize = 9.sp,
+            fontSize = 10.sp,
             fontFamily = MsFonts.mono,
-            modifier = Modifier.width(84.dp),
+            modifier = Modifier.width(90.dp),
         )
         Slider(
             value = value.coerceIn(range.start, range.endInclusive),
@@ -85,9 +87,9 @@ private fun ParamRow(
         Text(
             "%.2f".format(value),
             color = MsColors.textSecondary,
-            fontSize = 10.sp,
+            fontSize = 11.sp,
             fontFamily = MsFonts.mono,
-            modifier = Modifier.width(46.dp),
+            modifier = Modifier.width(54.dp),
         )
     }
 }
@@ -300,11 +302,11 @@ private fun InfoRow(label: String, value: String) {
         Text(
             label,
             color = MsColors.textMuted,
-            fontSize = 9.sp,
+            fontSize = 10.sp,
             fontFamily = MsFonts.mono,
-            modifier = Modifier.width(72.dp),
+            modifier = Modifier.width(78.dp),
         )
-        Text(value, color = MsColors.textSecondary, fontSize = 11.sp, fontFamily = MsFonts.mono)
+        Text(value, color = MsColors.textSecondary, fontSize = 12.sp, fontFamily = MsFonts.mono)
     }
 }
 
@@ -312,10 +314,14 @@ private fun InfoRow(label: String, value: String) {
 private fun SmallAction(label: String, onClick: () -> Unit) {
     Box(
         Modifier
-            .border(1.dp, MsColors.border, RoundedCornerShape(2.dp))
+            .heightIn(min = 34.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(MsColors.surfaceHigh)
+            .border(1.dp, MsColors.border, RoundedCornerShape(8.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 5.dp)
+            .padding(horizontal = 14.dp, vertical = 7.dp),
+        contentAlignment = Alignment.Center,
     ) {
-        Text(label, color = MsColors.accentSoft, fontSize = 11.sp)
+        Text(label, color = MsColors.accentSoft, fontSize = 12.sp)
     }
 }

@@ -1746,11 +1746,22 @@ class EditorEngine(
         return out[0] to out[1]
     }
 
-    fun setClipAudio(trackId: Int, clipId: Int, gain: Float, pan: Float): Boolean {
+    /**
+     * [refresh] re-reads the document so every view of the clip agrees. A slider
+     * drags at pointer rate, and reload() serialises and reparses the whole
+     * project, so a drag passes refresh = false and reloads once on release.
+     */
+    fun setClipAudio(
+        trackId: Int,
+        clipId: Int,
+        gain: Float,
+        pan: Float,
+        refresh: Boolean = true,
+    ): Boolean {
         val ok = NativeEngine.nativeClipAudioSet(trackId, clipId, gain, pan)
         if (ok) {
             markDirty()
-            reload()
+            if (refresh) reload()
         }
         return ok
     }
@@ -1789,11 +1800,11 @@ class EditorEngine(
     fun clipAudioKeyframeCount(trackId: Int, clipId: Int, prop: Int): Int =
         NativeEngine.nativeAudioKeyframeCount(trackId, clipId, prop)
 
-    fun setTrackGain(trackId: Int, gain: Float): Boolean {
+    fun setTrackGain(trackId: Int, gain: Float, refresh: Boolean = true): Boolean {
         val ok = NativeEngine.nativeTrackGain(trackId, gain)
         if (ok) {
             markDirty()
-            reload()
+            if (refresh) reload()
         }
         return ok
     }

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -64,7 +65,12 @@ fun LooksSheet(engine: EditorEngine, onDismiss: () -> Unit) {
         sheetState = sheetState,
         containerColor = MsColors.surface,
     ) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.92f)
+                .padding(horizontal = 20.dp)
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(
@@ -148,7 +154,7 @@ fun LooksSheet(engine: EditorEngine, onDismiss: () -> Unit) {
                 valueRange = 0f..1f,
             )
 
-            LazyColumn(Modifier.fillMaxWidth().height(320.dp)) {
+            LazyColumn(Modifier.fillMaxWidth().weight(1f)) {
                 items(Looks) { look ->
                     // The clip look is stored as a resolved path, so match on the
                     // file name rather than holding on to an asset name in state.

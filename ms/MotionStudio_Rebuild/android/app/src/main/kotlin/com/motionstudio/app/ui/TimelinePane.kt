@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -70,7 +71,7 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 
 private val HeaderWidth = 104.dp
-private val RulerHeight = 30.dp
+private val RulerHeight = 34.dp
 private val LaneHeight = 48.dp
 private val ClipInset = 7.dp
 private val GripWidth = 14.dp
@@ -167,7 +168,7 @@ fun TimelinePane(
         Column(Modifier.fillMaxSize()) {
             // ---- head-up strip -------------------------------------------------
             Row(
-                Modifier.fillMaxWidth().height(30.dp).background(MsColors.surfaceHigh)
+                Modifier.fillMaxWidth().height(38.dp).background(MsColors.surfaceHigh)
                     .padding(horizontal = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -499,7 +500,7 @@ private fun SelectionBar(
     Column {
         Box(Modifier.fillMaxWidth().height(1.dp).background(MsColors.border))
         Row(
-            Modifier.fillMaxWidth().height(38.dp).background(MsColors.surfaceHigh)
+            Modifier.fillMaxWidth().height(46.dp).background(MsColors.surfaceHigh)
                 .horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -923,22 +924,31 @@ private fun Modifier.pinchToZoom(onZoom: (factor: Float, focusX: Float) -> Unit)
         }
     }
 
+/**
+ * Timeline command chip. 30 dp tall with 10 dp sides: the old 19 dp pill was
+ * below the minimum touch target and every strip of controls read as a row of
+ * debug labels rather than buttons.
+ */
 @Composable
 private fun Chip(label: String, active: Boolean, onClick: () -> Unit) {
     Box(
         Modifier
+            .heightIn(min = 30.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(if (active) MsColors.accentDim.copy(alpha = 0.55f) else MsColors.surfaceHigh)
             .border(
                 1.dp,
                 if (active) MsColors.accent else MsColors.border,
-                RoundedCornerShape(2.dp),
+                RoundedCornerShape(6.dp),
             )
             .clickable { onClick() }
-            .padding(horizontal = 7.dp, vertical = 3.dp),
+            .padding(horizontal = 10.dp, vertical = 5.dp),
+        contentAlignment = Alignment.Center,
     ) {
         Text(
             label,
-            color = if (active) MsColors.accent else MsColors.textSecondary,
-            fontSize = 9.sp,
+            color = if (active) MsColors.accentSoft else MsColors.textSecondary,
+            fontSize = 10.sp,
             fontFamily = MsFonts.mono,
             fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
         )

@@ -1,21 +1,29 @@
 package com.motionstudio.app.ui
 
+import android.os.Build
 import android.widget.Toast
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
-import android.os.Build
 import com.motionstudio.app.data.ProjectStore
 import com.motionstudio.app.data.SettingsStore
 import com.motionstudio.app.diag.Diagnostics
 import com.motionstudio.app.editor.EditorEngine
 import com.motionstudio.app.native.NativeEngine
 import com.motionstudio.app.ui.theme.MotionStudioTheme
+import com.motionstudio.app.ui.theme.MsColors
 
 private enum class Screen { Starter, Settings }
 
@@ -34,7 +42,9 @@ fun MotionStudioRoot(settings: SettingsStore) {
         // Without the engine there is no editor to show. Replacing the UI here
         // keeps the first native call from throwing out of a button handler.
         if (!NativeEngine.available) {
-            EngineUnavailableScreen(NativeEngine.loadError, Build.SUPPORTED_ABIS.toList())
+            SafeFrame {
+                EngineUnavailableScreen(NativeEngine.loadError, Build.SUPPORTED_ABIS.toList())
+            }
             return@MotionStudioTheme
         }
 
@@ -56,13 +66,16 @@ fun MotionStudioRoot(settings: SettingsStore) {
                 },
             )
 
-            screen == Screen.Settings -> SettingsScreen(
-                settings = settings,
-                onBack = { screen = Screen.Starter },
-            )
+            screen == Screen.Settings -> SafeFrame {
+                SettingsScreen(
+                    settings = settings,
+                    onBack = { screen = Screen.Starter },
+                )
+            }
 
-            else -> StarterScreen(
-                store = store,
+            else -> SafeFrame {
+                StarterScreen(
+                    store = store,
                 onOpenProject = { file ->
                     val created = runCatching { EditorEngine(store) { settings.autosaveEnabled } }
                         .getOrNull()
@@ -92,7 +105,24 @@ fun MotionStudioRoot(settings: SettingsStore) {
                     }
                 },
                 onSettings = { screen = Screen.Settings },
-            )
+                )
+            }
         }
+    }
+}
+
+/**
+ * The launcher screens do not sit in a Scaffold, and the activity is
+ * edge-to-edge, so without this the identity strip is drawn underneath the
+ * status bar clock and the last project row under the gesture bar. The editor
+ * screen gets the same insets from its own Scaffold and is not wrapped.
+ */
+@Composable
+private fun SafeFrame(content: @Composable () -> Unit) {
+    Box(
+        Modifier.fillMaxSize().background(MsColors.background)
+            .windowInsetsPadding(WindowInsets.safeDrawing)
+    ) {
+        content()
     }
 }

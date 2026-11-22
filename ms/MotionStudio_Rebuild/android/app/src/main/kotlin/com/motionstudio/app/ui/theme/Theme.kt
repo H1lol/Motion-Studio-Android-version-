@@ -1,6 +1,5 @@
 package com.motionstudio.app.ui.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
@@ -25,17 +24,17 @@ object MsColors {
     val surface = Color(0xFF0D0B14)
     val surfaceHigh = Color(0xFF141020)
     val surfaceHighest = Color(0xFF1C1630)
-    val border = Color(0xFF2B2340)
-    val borderSoft = Color(0xFF1A1526)
+    val border = Color(0xFF332B4C)
+    val borderSoft = Color(0xFF241E34)
 
     val accent = Color(0xFFA98BFF)
     val accentSoft = Color(0xFFC9B8FF)
     val accentDim = Color(0xFF4B3480)
 
     val textPrimary = Color(0xFFF0EDF8)
-    val textSecondary = Color(0xFFB6AECB)
-    val textTertiary = Color(0xFF8B82A4)
-    val textMuted = Color(0xFF5D5573)
+    val textSecondary = Color(0xFFBBB3D0)
+    val textTertiary = Color(0xFFA79EBD)
+    val textMuted = Color(0xFF857C9C)
 
     val success = Color(0xFF63D6A2)
     val warning = Color(0xFFF0B429)
@@ -87,7 +86,6 @@ private val MsTypography = Typography(
 
 @Composable
 fun MotionStudioTheme(accent: Color = MsColors.accent, content: @Composable () -> Unit) {
-    val dark = isSystemInDarkTheme()
     val scheme = darkColorScheme(
         primary = accent,
         onPrimary = Color(0xFF120A22),
@@ -104,7 +102,10 @@ fun MotionStudioTheme(accent: Color = MsColors.accent, content: @Composable () -
         error = MsColors.error,
     )
     MaterialTheme(
-        colorScheme = if (dark) scheme else scheme,
+        // The app is a compositor workspace: there is one palette, and it is dark.
+        // Following the system light theme would leave Material controls (sliders,
+        // switches, text fields) light-on-black.
+        colorScheme = scheme,
         typography = MsTypography.copy(
             bodyLarge = MsTypography.bodyMedium,
             labelLarge = MsTypography.labelMedium,

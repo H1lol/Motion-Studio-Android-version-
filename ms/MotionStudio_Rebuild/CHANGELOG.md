@@ -1,5 +1,49 @@
 # Changelog
 
+## Unreleased — interface pass
+
+### Fixed
+- **Launcher screens drew under the system bars.** The activity is edge-to-edge and only
+  the editor had a Scaffold supplying insets, so the projects list started beneath the
+  status bar clock and the last row sat under the gesture bar. Home, settings and the
+  engine-unavailable screen are now wrapped in one safe-drawing frame
+- **Every sheet stopped at a fixed height.** Effects and audio pinned their lists to
+  430 dp and looks to 320 dp: on a landscape phone the bottom third was cut off and on a
+  tablet the sheet ended in empty panel. Each sheet now takes 92% of the screen and the
+  list fills whatever the header and meter leave behind
+- **Faders stuttered.** A track or clip gain slider pushed a value per pointer event and
+  `setTrackGain`/`setClipAudio` answered by serialising and reparsing the whole project
+  through `reload()`. Both take `refresh = false` now, the slider follows a local value
+  and the document is re-read once on `onValueChangeFinished`
+- **The eighth mask was unreachable.** The mask strip and both chip rows overflowed the
+  sheet with no scroll; they scroll horizontally now
+- **Two inserts of the same kind shared one slider.** Insert cards derived their slider
+  draft key from the chain ("master", "track 4") instead of the insert, so a second
+  compressor on the same chain was dragged by the first card. The key now carries the
+  insert index
+- **Nothing to close a sheet with.** Sheets opened on a bare title and the only exit was
+  the drag handle. `SheetHeader` gives every one a 40 dp close button next to the title
+
+### Changed
+- **Contrast.** Tertiary and muted text were 3:1 on the workspace black and read as
+  disabled. Both were lifted (muted #5D5573 → #857C9C, tertiary #8B82A4 → #A79EBD) and the
+  panel edges a step lighter
+- **Touch targets.** Timeline chips were 19 dp pills with a 2 dp radius; they are 30 dp
+  minimum with 6 dp corners and 10 dp sides, and every sheet chip is at least 38 dp.
+  Workspace tabs are 42 dp, the selection strip 46 dp and panel headers 32 dp
+- **Type scale.** Micro labels moved up a step (8–9 sp headings to 10 sp, 10 sp values to
+  11–12 sp) so the chrome reads as labels instead of debug output
+- **Viewport framing.** The inset rectangle drawn over the picture is gone; four corner
+  rules mark the canvas edge without boxing in the image being judged. The master mix
+  meter sits on its own panel instead of floating in the sheet background
+- **Dark only.** The theme no longer branches on the system light/dark setting: it always
+  returned the same scheme, and the warning comment now says why
+
+### Verified
+- Kotlin/Compose were reviewed, not compiled: this environment has no Android SDK, Gradle
+  or Compose artifacts. Files were checked for balanced structure and imports; behaviour
+  is unverified on a device
+
 ## Unreleased — mix loudness meter
 
 ### Added

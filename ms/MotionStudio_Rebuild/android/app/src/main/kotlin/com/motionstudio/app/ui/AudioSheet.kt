@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -25,6 +26,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -130,20 +132,26 @@ fun AudioSheet(engine: EditorEngine, onDismiss: () -> Unit) {
         sheetState = sheetState,
         containerColor = MsColors.surface,
     ) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
-            Text("Audio", color = MsColors.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(2.dp))
-            Text(
-                "Master insert chain and track mixer · mixed in C++",
-                color = MsColors.textTertiary,
-                fontSize = 12.sp,
+        Column(
+            Modifier
+                .fillMaxWidth()
+                // A fixed 430 dp list left a dead strip on tall screens and was
+                // cut off by the navigation bar in landscape. The sheet now owns
+                // a share of the screen and the list takes whatever is left.
+                .fillMaxHeight(0.92f)
+                .padding(horizontal = 20.dp)
+        ) {
+            SheetHeader(
+                title = "Audio",
+                subtitle = "Master chain, per-track inserts and clip automation — summed in C++",
+                onDismiss = onDismiss,
             )
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(12.dp))
             MixMeter(meter)
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(4.dp))
 
-            LazyColumn(Modifier.fillMaxWidth().height(430.dp)) {
-                item { SectionLabel("MASTER CHAIN") }
+            LazyColumn(Modifier.fillMaxWidth().weight(1f)) {
+                item { SheetSection("MASTER CHAIN", "${inserts.size} INSERT${if (inserts.size == 1) "" else "S"}") }
                 if (inserts.isEmpty()) {
                     item {
                         Text(
@@ -160,7 +168,9 @@ fun AudioSheet(engine: EditorEngine, onDismiss: () -> Unit) {
                         subtitle = "INSERT ${insert.index + 1}",
                         kind = insert.kind,
                         enabled = insert.enabled,
-                        draftPrefix = "m",
+                        // Indexed: two compressors on one chain used to share a
+                        // draft key, so dragging one moved the other.
+                        draftPrefix = "m${insert.index}",
                         drafts = drafts,
                         onEnabledChange = { engine.setAudioInsertEnabled(insert.index, it) },
                         onRemove = { engine.removeAudioInsert(insert.index) },
@@ -180,7 +190,7 @@ fun AudioSheet(engine: EditorEngine, onDismiss: () -> Unit) {
                     }
                 }
 
-                item { SectionLabel("ADD INSERT") }
+                item { SheetSection("ADD INSERT") }
                 items(AUDIO_INSERT_NAMES.chunked(3)) { row ->
                     Row(
                         Modifier.fillMaxWidth().padding(vertical = 2.dp),
@@ -202,7 +212,7 @@ fun AudioSheet(engine: EditorEngine, onDismiss: () -> Unit) {
                     }
                 }
 
-                item { SectionLabel("TRACK MIXER") }
+                item { SheetSection("TRACK MIXER", "${tracks.size} TRACK${if (tracks.size == 1) "" else "S"}") }
                 if (tracks.isEmpty()) {
                     item {
                         Text(
@@ -215,7 +225,7 @@ fun AudioSheet(engine: EditorEngine, onDismiss: () -> Unit) {
                 }
                 items(tracks) { track -> TrackStrip(engine, track, revision, drafts) }
 
-                item { SectionLabel("CLIP AUDIO") }
+                item { SheetSection("CLIP AUDIO") }
                 val clips = tracks.flatMap { track ->
                     track.clips.filter { !it.isText }.map { track to it }
                 }
@@ -242,7 +252,12 @@ fun AudioSheet(engine: EditorEngine, onDismiss: () -> Unit) {
 @Composable
 private fun MixMeter(meter: FloatArray) {
     val peak = maxOf(meter[0], meter[1])
-    Column(Modifier.fillMaxWidth()) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(MsColors.surfaceHigh, RoundedCornerShape(8.dp))
+            .padding(horizontal = 10.dp, vertical = 8.dp)
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 "PEAK",
@@ -280,20 +295,9 @@ private fun MixMeter(meter: FloatArray) {
             color = MsColors.textTertiary,
             fontSize = 9.sp,
             fontFamily = MsFonts.mono,
-            modifier = Modifier.padding(start = 40.dp, top = 2.dp),
+            modifier = Modifier.padding(start = 40.dp, top = 3.dp),
         )
     }
-}
-
-@Composable
-private fun SectionLabel(text: String) {
-    Text(
-        text,
-        color = MsColors.textMuted,
-        fontSize = 9.sp,
-        fontFamily = MsFonts.mono,
-        modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
-    )
 }
 
 @Composable
@@ -365,7 +369,12 @@ private fun TrackStrip(
     revision: Int,
     drafts: MutableMap<String, Float>,
 ) {
-    val gain = track.gain.toFloat().coerceIn(0f, 2f)
+    // The slider follows a local value while it is dragged. Pushing every pixel
+    // through nativeTrackGain + a full project JSON round trip made the fader
+    // stutter, so the engine is refreshed once, when the finger lifts.
+    var gain by remember(track.id) {
+        mutableFloatStateOf(track.gain.toFloat().coerceIn(0f, 2f))
+    }
     var chainOpen by remember(track.id) { mutableStateOf(false) }
     val chain = remember(revision, track.id) { engine.trackAudioInserts(track.id) }
     Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
@@ -395,7 +404,11 @@ private fun TrackStrip(
             )
             Slider(
                 value = gain,
-                onValueChange = { engine.setTrackGain(track.id, it) },
+                onValueChange = {
+                    gain = it
+                    engine.setTrackGain(track.id, it, refresh = false)
+                },
+                onValueChangeFinished = { engine.reload() },
                 valueRange = 0f..2f,
                 modifier = Modifier.weight(1f),
             )
@@ -415,7 +428,7 @@ private fun TrackStrip(
                     subtitle = "${track.name.uppercase()} · INSERT ${insert.index + 1}",
                     kind = insert.kind,
                     enabled = insert.enabled,
-                    draftPrefix = "t${track.id}",
+                    draftPrefix = "t${track.id}.${insert.index}",
                     drafts = drafts,
                     onEnabledChange = {
                         engine.setTrackAudioInsertEnabled(track.id, insert.index, it)
@@ -525,8 +538,9 @@ private fun ClipAudioRow(
                 value = gain.coerceIn(0f, 2f),
                 onValueChange = {
                     drafts[gainKey] = it
-                    engine.setClipAudio(track.id, clip.id, it, pan)
+                    engine.setClipAudio(track.id, clip.id, it, pan, refresh = false)
                 },
+                onValueChangeFinished = { engine.reload() },
                 valueRange = 0f..2f,
                 modifier = Modifier.weight(1f),
             )
@@ -550,8 +564,9 @@ private fun ClipAudioRow(
                 value = pan.coerceIn(-1f, 1f),
                 onValueChange = {
                     drafts[panKey] = it
-                    engine.setClipAudio(track.id, clip.id, gain, it)
+                    engine.setClipAudio(track.id, clip.id, gain, it, refresh = false)
                 },
+                onValueChangeFinished = { engine.reload() },
                 valueRange = -1f..1f,
                 modifier = Modifier.weight(1f),
             )
