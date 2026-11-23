@@ -114,10 +114,11 @@ on the effect library. Minimum device requirement is 1.5 GB RAM.
    scale per frame (`ms_parent_test`). Opacity is intentionally not inherited. The UI row
    lives in Motion; Session adds the null.
 3. **Pan/zoom is explicit — landed.** The viewport has a visible PAN / ZOOM toggle. On, two
-   fingers pan and pinch the canvas. Off with a layer selected, a two-finger gesture moves
-   and scales that layer and commits position and scale keys at the playhead; off with
-   nothing selected it falls back to canvas panning. The only documented gesture left out
-   is two-finger double-tap recentre, which the app does not need yet.
+   fingers pan and pinch the canvas, and two-finger double-tap recentres it. Off with a
+   layer selected, a two-finger gesture moves and scales that layer and commits position
+   and scale keys at the playhead; off with nothing selected it falls back to canvas
+   panning. A tap that does not move selects the layer drawn under the point, using the
+   renderer's transform (`ms_hit_test`), and a tap on empty picture clears the selection.
 4. **Preview quality — landed.** Full / Half / Quarter in Settings and Session set the
    composite scale (100/50/25%) in the engine; proxies remain the separate, automatic
    decode path. Export and the still export force full resolution, so the setting cannot

@@ -34,6 +34,16 @@ public:
    */
   Error render_frame_at(TimeSec t, ImageBuffer& out, int width, int height);
 
+  /**
+   * Picks the layer under a point on the composite, for tapping in the preview.
+   * `nx`/`ny` are normalized 0..1 across the output frame at timeline time `t`,
+   * so the caller does not have to know the preview scale or the view size.
+   * Fills the owning track and the clip; returns false when the point misses
+   * every visible layer. The box is derived from the same transform the
+   * renderer applies, so what is composited is what can be tapped.
+   */
+  bool hit_test(TimeSec t, float nx, float ny, TrackId* track, ClipId* clip) const;
+
   /** Current playhead helpers */
   Error scrub(TimeSec t, ImageBuffer& out) { return render_frame(t, out); }
 
@@ -68,6 +78,15 @@ private:
    */
   void apply_clip_look(const ClipInfo& clip, TimeSec clip_local, ImageBuffer& buf,
                        ImageBuffer& tmp);
+
+  /**
+   * Resolved compositing transform of a clip at timeline time `time`: opacity,
+   * translation in output pixels and scale, with the parent chain folded in.
+   * Shared by the compositor and hit_test() so a tap can never disagree with
+   * the picture.
+   */
+  void clip_transform(const ClipInfo& clip, TimeSec time, float* opacity, float* dx,
+                      float* dy, float* scale) const;
 
   /** Parsed `.cube` cache: a look is read from disk once, not once per frame. */
   const Lut3D* lut_for(const std::string& path);

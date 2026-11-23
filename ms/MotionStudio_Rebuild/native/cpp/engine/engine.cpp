@@ -291,6 +291,13 @@ void Engine::preview_frame_size(int* width, int* height) const {
     if (height) *height = h;
 }
 
+bool Engine::preview_hit_test(float nx, float ny, TrackId* track, ClipId* clip) const {
+    if (track) *track = 0;
+    if (clip) *clip = 0;
+    if (!player_ || !project_) return false;
+    return player_->hit_test(impl_->current_time.load(), nx, ny, track, clip);
+}
+
 bool Engine::load_look(const std::string& path) {
     auto lut = std::make_unique<Lut3D>();
     if (!load_cube_lut(path, *lut)) return false;

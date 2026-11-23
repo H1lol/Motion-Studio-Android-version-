@@ -1,5 +1,43 @@
 # Changelog
 
+## Unreleased — viewport tap-to-select and double-tap recentre
+
+### Added
+- **Tap a layer in the preview to select it.** A finger that touches down and lifts without
+  moving is a tap, not a pan: the point is mapped through the composite exactly as last
+  drawn (canvas zoom, letterbox and preview quality all resolved), and the engine picks the
+  layer composited there. The pick uses the renderer's own transform, so a scaled, moved or
+  parented layer is picked where its pixels are, not where the frame is. The topmost track
+  wins where layers overlap, and a tap on empty picture clears the selection
+- **Two-finger double-tap recentres the canvas**, in PAN / ZOOM mode only. Two fingers that
+  lift within 280 ms without moving count as a tap; a second one within 350 ms resets the
+  pan and zoom. With the toggle off the same fingers mean a layer transform, so they never
+  recentre by accident
+- **Engine surface.** `TimelinePlayer::hit_test` returns the track and clip under a
+  normalized point at the playhead; `Engine::preview_hit_test` exposes it, bridged as
+  `ms_preview_hit_test` and mirrored in JNI as `nativePreviewHitTest`, with
+  `EditorEngine.pickAt` owning the selection change. The compositor and the hit test share
+  one `clip_transform`, so the two cannot drift apart. Null objects and adjustment layers
+  draw no pixels of their own and are never picked
+
+### Verified
+- `ms_hit_test` (new, in `ctest`): a full-frame layer is picked at the centre and the
+  corner; a half-size layer loses the corner; a moved box is picked where it now sits and
+  not where it was; the overlay above wins at the covered point and the base layer is
+  picked outside it; a null object above is never picked; out-of-frame points and a
+  playhead past every layer pick nothing. Native suite: **29/30**, with
+  `ms_audio_playback_test` still the only failure because this container has no `ffmpeg`
+  CLI for its fixtures
+- `:app:assembleDebug` succeeds, and `libmotionstudio_jni.so` carries
+  `nativePreviewHitTest` for arm64-v8a and x86_64
+- Not verified: no device or emulator here, so tap picking against a real finger, the tap
+  slop, and the double-tap timing were not exercised by hand
+
+### Provenance
+Behaviour described here comes from Alight Creative's public documentation of preview pan
+and zoom and from this project's own implementation. No code, string, curve table or asset
+is taken from another editor.
+
 ## Unreleased — preview pan/zoom mode and preview quality
 
 ### Added

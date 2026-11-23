@@ -83,6 +83,11 @@ object NativeEngine {
     external fun nativePreviewScaleSet(scale: Float): Boolean
     /** Size of the frame the preview currently produces, into [w, h]. */
     external fun nativePreviewFrameSize(out: IntArray): Boolean
+    /**
+     * Picks the layer under a normalized point (0..1) of the composite at the
+     * playhead, into `[trackId, clipId]`. False when the tap missed every layer.
+     */
+    external fun nativePreviewHitTest(nx: Float, ny: Float, out: IntArray): Boolean
 
     // Proxy media: preview decodes the registered stand-in, export turns proxies
     // off first so the delivered master always comes from the source file.

@@ -279,6 +279,15 @@ void TimelinePlayer::render_clip_into(const ClipInfo& clip, TimeSec time, int W,
 
   apply_clip_look(clip, local, frame, alt);
 
+  float op = 1.f, px = 0.f, py = 0.f, sc = 1.f;
+  clip_transform(clip, time, &op, &px, &py, &sc);
+  blit_transformed(frame, dst, op, px, py, sc);
+}
+
+void TimelinePlayer::clip_transform(const ClipInfo& clip, TimeSec time, float* opacity,
+                                    float* dx, float* dy, float* scale) const {
+  const double max_local = std::max(0.0, clip.duration * clip.speed - 1e-3);
+  const double local = std::clamp((time - clip.start) * clip.speed, 0.0, max_local);
   const float op = static_cast<float>(
       clip.opacity * (clip.motion.opacity.empty() ? 1.0 : clip.motion.opacity_at(local)));
   float sc = static_cast<float>(
@@ -326,7 +335,57 @@ void TimelinePlayer::render_clip_into(const ClipInfo& clip, TimeSec time, int W,
     py = pdy + py * pscale;
     sc *= pscale;
   }
-  blit_transformed(frame, dst, op, px, py, sc);
+
+  if (opacity) *opacity = op;
+  if (dx) *dx = px;
+  if (dy) *dy = py;
+  if (scale) *scale = sc;
+}
+
+bool TimelinePlayer::hit_test(TimeSec t, float nx, float ny, TrackId* out_track,
+                              ClipId* out_clip) const {
+  if (out_track) *out_track = 0;
+  if (out_clip) *out_clip = 0;
+  if (!session_) return false;
+  if (!std::isfinite(nx) || !std::isfinite(ny)) return false;
+  const int W = output_width();
+  const int H = output_height();
+  if (W <= 0 || H <= 0) return false;
+  const float x = nx * static_cast<float>(W);
+  const float y = ny * static_cast<float>(H);
+
+  // render_frame() composites the tracks in document order, so the last visible
+  // non-audio track is the topmost one and is tested first. Within a track the
+  // clips are drawn in order, so a later clip covers an earlier one at the same
+  // point; both loops therefore run backwards.
+  const auto& tracks = session_->tracks();
+  for (auto ti = tracks.rbegin(); ti != tracks.rend(); ++ti) {
+    const TrackInfo& track = *ti;
+    if (!track.visible || track.muted) continue;
+    if (track.type == static_cast<int>(TrackType::Audio)) continue;
+    for (auto ci = track.clips.rbegin(); ci != track.clips.rend(); ++ci) {
+      const ClipInfo& clip = *ci;
+      // A null has no pixels and an adjustment layer covers the whole frame:
+      // neither is something a tap on the picture can land on.
+      if (clip.is_null || clip.is_adjustment) continue;
+      if (t < clip.start || t >= clip.start + clip.duration) continue;
+      float op = 1.f, dx = 0.f, dy = 0.f, sc = 1.f;
+      clip_transform(clip, t, &op, &dx, &dy, &sc);
+      if (op <= 0.01f) continue;
+      // The clip's image is rendered at the output size and blitted scaled about
+      // the frame centre, so its box is the frame box scaled by `sc` and moved
+      // by (dx, dy).
+      const float w = static_cast<float>(W) * sc;
+      const float h = static_cast<float>(H) * sc;
+      const float ox = (static_cast<float>(W) - w) * 0.5f + dx;
+      const float oy = (static_cast<float>(H) - h) * 0.5f + dy;
+      if (x < ox || x > ox + w || y < oy || y > oy + h) continue;
+      if (out_track) *out_track = track.id;
+      if (out_clip) *out_clip = clip.id;
+      return true;
+    }
+  }
+  return false;
 }
 
 Error TimelinePlayer::render_frame(TimeSec t, ImageBuffer& out) {

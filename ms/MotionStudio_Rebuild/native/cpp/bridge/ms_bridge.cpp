@@ -220,6 +220,14 @@ int ms_preview_frame_size(int* width, int* height) {
     e.preview_frame_size(width, height);
     return 0;
 }
+int ms_preview_hit_test(float nx, float ny, int* track_id, int* clip_id) {
+    ms::TrackId track = 0;
+    ms::ClipId clip = 0;
+    if (!ms::Engine::instance().preview_hit_test(nx, ny, &track, &clip)) return -1;
+    if (track_id) *track_id = static_cast<int>(track);
+    if (clip_id) *clip_id = static_cast<int>(clip);
+    return 0;
+}
 int ms_project_load(const char* json) { return json && ms::Engine::instance().load_project_json(json) ? 0 : -1; }
 int ms_project_save(const char* path) { return path && ms::Engine::instance().save_project(path).ok() ? 0 : -1; }
 int ms_project_autosave(const char* path) { return path && ms::Engine::instance().autosave_project(path).ok() ? 0 : -1; }

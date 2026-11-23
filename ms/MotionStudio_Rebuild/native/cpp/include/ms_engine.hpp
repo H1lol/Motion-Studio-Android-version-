@@ -59,6 +59,13 @@ public:
     /** Size of the frame render_frame() produces at the current preview scale. */
     void preview_frame_size(int* width, int* height) const;
 
+    /**
+     * Picks the topmost layer at a normalized point of the composite at the
+     * playhead, for tapping straight in the preview. Fills the owning track and
+     * clip; false when the point misses every visible layer.
+     */
+    bool preview_hit_test(float nx, float ny, TrackId* track, ClipId* clip) const;
+
     ProjectSession& project() { return *project_; }
     const ProjectSession& project() const { return *project_; }
 

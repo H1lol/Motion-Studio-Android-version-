@@ -472,6 +472,34 @@ class EditorEngine(
         selectedClipId = clipId
     }
 
+    /**
+     * Selects the layer under a point tapped in the preview: [nx] and [ny] are
+     * normalized 0..1 across the composited frame, so the view resolves its
+     * own zoom, letterboxing and preview quality before calling here.
+     *
+     * The engine hit-tests with the same transform it composites, so what is
+     * under the finger is what gets selected. A tap on empty picture clears the
+     * selection, which is how a canvas deselects.
+     */
+    fun pickAt(nx: Float, ny: Float): Boolean {
+        val out = IntArray(2)
+        val hit = NativeEngine.nativePreviewHitTest(nx, ny, out)
+        val track = if (hit) out[0] else -1
+        val clip = if (hit) out[1] else -1
+        if (clip <= 0) {
+            if (selectedClipId > 0) {
+                selectedClipId = -1
+                status = "Nothing selected"
+            }
+            return false
+        }
+        if (selectedTrackId == track && selectedClipId == clip) return true
+        select(track, clip)
+        val name = doc.clipById(track, clip)?.name?.takeIf { it.isNotBlank() } ?: "layer"
+        status = "Selected $name"
+        return true
+    }
+
     fun splitAtPlayhead(): Boolean {
         val trackId = selectedTrackId
         val clipId = selectedClipId

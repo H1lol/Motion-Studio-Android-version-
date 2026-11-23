@@ -428,6 +428,9 @@ private fun Viewport(engine: EditorEngine, modifier: Modifier = Modifier) {
                         view.onLayerTransform = { dx, dy, scale ->
                             engine.transformSelectedLayer(dx, dy, scale)
                         }
+                        // Tap-to-select: the view reports a point on the
+                        // composite and the engine picks the layer drawn there.
+                        view.onPickLayer = { nx, ny -> engine.pickAt(nx, ny) }
                     }
                 },
                 update = { view ->

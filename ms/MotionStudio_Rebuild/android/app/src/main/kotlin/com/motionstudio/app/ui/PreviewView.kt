@@ -9,6 +9,7 @@ import android.graphics.Rect
 import android.graphics.RectF
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import com.motionstudio.app.editor.EditorEngine
 import com.motionstudio.app.model.PreviewRatio
 import com.motionstudio.app.native.NativeEngine
@@ -112,6 +113,29 @@ class PreviewView(context: Context) : View(context) {
     /** Size of the composite as last drawn, so gestures can speak in canvas fractions. */
     private var drawnFrameW = 0f
     private var drawnFrameH = 0f
+    private var drawnFrameLeft = 0f
+    private var drawnFrameTop = 0f
+
+    // ---- Tapping -----------------------------------------------------------
+    //
+    // A finger that touches down and lifts without moving is a tap, not the
+    // start of a pan: it picks the layer under the point. Two fingers used that
+    // way twice in quick succession recentre the canvas, but only in PAN / ZOOM
+    // mode — with the toggle off the same two fingers mean a layer transform.
+    private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
+    private var downX = 0f
+    private var downY = 0f
+    private var downAtMs = 0L
+    private var multiTouch = false
+
+    private var twoTapStartedMs = 0L
+    private var twoTapStartX = 0f
+    private var twoTapStartY = 0f
+    private var twoTapMoved = false
+    private var lastTwoTapMs = 0L
+
+    /** Called with a normalized point (0..1) of the composite when it is tapped. */
+    var onPickLayer: ((nx: Float, ny: Float) -> Unit)? = null
 
     private val hudPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#E6FFFFFF")
@@ -293,6 +317,8 @@ class PreviewView(context: Context) : View(context) {
             canvas.drawRect(dst, borderPaint)
             drawnFrameW = dst.width()
             drawnFrameH = dst.height()
+            drawnFrameLeft = dst.left
+            drawnFrameTop = dst.top
         }
 
         // While a layer gesture is in flight the picture only updates on release,
@@ -335,12 +361,17 @@ class PreviewView(context: Context) : View(context) {
             MotionEvent.ACTION_DOWN -> {
                 lastX = event.x
                 lastY = event.y
+                downX = event.x
+                downY = event.y
+                downAtMs = event.eventTime
+                multiTouch = false
                 twoFinger = false
                 oneFingerPan = navigating()
                 resetAccumulators()
                 parent?.requestDisallowInterceptTouchEvent(true)
             }
             MotionEvent.ACTION_POINTER_DOWN -> {
+                multiTouch = true
                 if (event.pointerCount >= 2) beginTwoFinger(event)
             }
             MotionEvent.ACTION_MOVE -> {
@@ -358,7 +389,7 @@ class PreviewView(context: Context) : View(context) {
                 }
             }
             MotionEvent.ACTION_POINTER_UP -> {
-                if (twoFinger) endTwoFinger()
+                if (twoFinger) endTwoFinger(event.eventTime)
                 // A finger left the screen: re-anchor the one-finger pan instead
                 // of letting the remaining pointer jump the canvas.
                 val remaining = (0 until event.pointerCount).firstOrNull {
@@ -371,7 +402,8 @@ class PreviewView(context: Context) : View(context) {
                 }
             }
             MotionEvent.ACTION_UP -> {
-                if (twoFinger) endTwoFinger()
+                if (twoFinger) endTwoFinger(event.eventTime)
+                else if (!multiTouch) tapAt(event)
                 parent?.requestDisallowInterceptTouchEvent(false)
                 // The view handles its own touches, so it must answer the
                 // accessibility click action too; a screen reader's "activate"
@@ -381,6 +413,7 @@ class PreviewView(context: Context) : View(context) {
             MotionEvent.ACTION_CANCEL -> {
                 parent?.requestDisallowInterceptTouchEvent(false)
                 cancelGesture()
+                lastTwoTapMs = 0L
             }
         }
         return true
@@ -392,6 +425,10 @@ class PreviewView(context: Context) : View(context) {
         lastCentroidX = (event.getX(0) + event.getX(1)) / 2f
         lastCentroidY = (event.getY(0) + event.getY(1)) / 2f
         lastSpan = spread(event)
+        twoTapStartedMs = event.eventTime
+        twoTapStartX = lastCentroidX
+        twoTapStartY = lastCentroidY
+        twoTapMoved = false
     }
 
     private fun updateTwoFinger(event: MotionEvent) {
@@ -401,6 +438,8 @@ class PreviewView(context: Context) : View(context) {
         val dx = cx - lastCentroidX
         val dy = cy - lastCentroidY
         val factor = if (lastSpan > 1f && span > 1f) (span / lastSpan).coerceIn(0.5f, 2f) else 1f
+        if (kotlin.math.hypot(cx - twoTapStartX, cy - twoTapStartY) > touchSlop) twoTapMoved = true
+        if (kotlin.math.abs(factor - 1f) > 0.02f) twoTapMoved = true
         lastCentroidX = cx
         lastCentroidY = cy
         lastSpan = span
@@ -423,12 +462,41 @@ class PreviewView(context: Context) : View(context) {
         invalidate()
     }
 
-    private fun endTwoFinger() {
+    private fun endTwoFinger(eventTime: Long) {
+        val wasTap = !twoTapMoved && eventTime - twoTapStartedMs < 280L
         if (gestureActive && !navigating()) {
             onLayerTransform?.invoke(gestureDx, gestureDy, gestureScale)
         }
         twoFinger = false
         cancelGesture()
+        if (navigateMode && wasTap) {
+            if (lastTwoTapMs != 0L && eventTime - lastTwoTapMs < 350L) {
+                lastTwoTapMs = 0L
+                resetView()
+            } else {
+                lastTwoTapMs = eventTime
+            }
+        } else {
+            lastTwoTapMs = 0L
+        }
+    }
+
+    /**
+     * A tap that never moved picks the layer under the finger. The point is
+     * mapped through the composite as last drawn, so the canvas zoom, the
+     * letterbox and the preview scale all resolve to the same normalized
+     * coordinate the engine's hit test uses.
+     */
+    private fun tapAt(event: MotionEvent) {
+        if (event.eventTime - downAtMs > 300L) return
+        if (kotlin.math.hypot(event.x - downX, event.y - downY) > touchSlop) return
+        val w = drawnFrameW
+        val h = drawnFrameH
+        if (w <= 0f || h <= 0f) return
+        val nx = (event.x - drawnFrameLeft) / w
+        val ny = (event.y - drawnFrameTop) / h
+        if (nx < 0f || nx > 1f || ny < 0f || ny > 1f) return
+        onPickLayer?.invoke(nx, ny)
     }
 
     private fun cancelGesture() {

@@ -68,6 +68,9 @@ float ms_preview_scale(void);
 int ms_preview_scale_set(float scale);
 // Size of the frame ms_render_frame() now produces. False when uninitialised.
 int ms_preview_frame_size(int* width, int* height);
+// Viewport picking: normalized (0..1) point across the composited frame at the
+// current playhead. Fills the topmost layer's track and clip; false on a miss.
+int ms_preview_hit_test(float nx, float ny, int* track_id, int* clip_id);
 
 // Timeline audio. The host audio thread pulls interleaved f32 PCM for the
 // current playhead; the master insert chain is already applied.
