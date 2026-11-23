@@ -27,6 +27,13 @@ public:
   /** Render one output frame at timeline time (seconds) */
   Error render_frame(TimeSec t, ImageBuffer& out);
 
+  /**
+   * Render one frame at an explicit size, or the session's output size when
+   * `width`/`height` are <= 0. The preview uses this to composite at a reduced
+   * quality; export always goes through render_frame() at full size.
+   */
+  Error render_frame_at(TimeSec t, ImageBuffer& out, int width, int height);
+
   /** Current playhead helpers */
   Error scrub(TimeSec t, ImageBuffer& out) { return render_frame(t, out); }
 

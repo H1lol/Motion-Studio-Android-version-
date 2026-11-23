@@ -330,10 +330,14 @@ void TimelinePlayer::render_clip_into(const ClipInfo& clip, TimeSec time, int W,
 }
 
 Error TimelinePlayer::render_frame(TimeSec t, ImageBuffer& out) {
+  return render_frame_at(t, out, output_width(), output_height());
+}
+
+Error TimelinePlayer::render_frame_at(TimeSec t, ImageBuffer& out, int width, int height) {
   if (!session_) return Error::make(ErrorCode::NotInitialized, "no session");
   reopen_after_proxy_change();
-  const int W = output_width();
-  const int H = output_height();
+  const int W = width > 0 ? width : output_width();
+  const int H = height > 0 ? height : output_height();
   if (!out.allocate(W, H, PixelFormat::RGBA8))
     return Error::make(ErrorCode::OutOfMemory, "frame buffer");
   out.clear(0.08f, 0.08f, 0.10f, 1.f);

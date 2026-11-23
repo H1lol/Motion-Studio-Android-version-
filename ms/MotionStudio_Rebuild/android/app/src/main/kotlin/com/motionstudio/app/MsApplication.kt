@@ -1,6 +1,7 @@
 package com.motionstudio.app
 
 import android.app.Application
+import com.motionstudio.app.data.PreviewQualityStore
 import com.motionstudio.app.diag.Diagnostics
 import com.motionstudio.app.media.ProxyStore
 
@@ -17,5 +18,8 @@ class MsApplication : Application() {
         // Proxy files live under filesDir, so the storage root is known before
         // the editor can open a project.
         ProxyStore.init(this)
+        // Preview quality is a device setting, so it is restored before the
+        // first frame is composited.
+        PreviewQualityStore.init(this)
     }
 }

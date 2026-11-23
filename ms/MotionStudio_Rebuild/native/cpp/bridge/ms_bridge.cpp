@@ -209,6 +209,17 @@ MSPreviewState ms_get_preview_state() {
     return {s.time, s.width, s.height, s.playing ? 1 : 0};
 }
 int ms_render_frame() { return ms::Engine::instance().render_frame() ? 0 : -1; }
+float ms_preview_scale() { return ms::Engine::instance().preview_scale(); }
+int ms_preview_scale_set(float scale) {
+    ms::Engine::instance().set_preview_scale(scale);
+    return 0;
+}
+int ms_preview_frame_size(int* width, int* height) {
+    const auto& e = ms::Engine::instance();
+    if (!e.is_initialized()) return -1;
+    e.preview_frame_size(width, height);
+    return 0;
+}
 int ms_project_load(const char* json) { return json && ms::Engine::instance().load_project_json(json) ? 0 : -1; }
 int ms_project_save(const char* path) { return path && ms::Engine::instance().save_project(path).ok() ? 0 : -1; }
 int ms_project_autosave(const char* path) { return path && ms::Engine::instance().autosave_project(path).ok() ? 0 : -1; }

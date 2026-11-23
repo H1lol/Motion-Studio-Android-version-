@@ -13,6 +13,7 @@
 #include "ms_autosave.hpp"
 #include <string>
 #include <functional>
+#include <atomic>
 
 namespace ms {
 
@@ -46,6 +47,17 @@ public:
     bool render_frame();
     bool copy_last_frame(void* rgba, size_t bytes) const;
     size_t last_frame_bytes() const;
+
+    /**
+     * Preview quality: a render scale in 0.25..1 applied to the composited
+     * frame. It is a preview setting, never a delivery one — export disables it
+     * and renders at the project canvas. Changing it drops the frame cache
+     * because cached frames are stored at the previous size.
+     */
+    void set_preview_scale(float scale);
+    float preview_scale() const { return preview_scale_.load(); }
+    /** Size of the frame render_frame() produces at the current preview scale. */
+    void preview_frame_size(int* width, int* height) const;
 
     ProjectSession& project() { return *project_; }
     const ProjectSession& project() const { return *project_; }
@@ -396,6 +408,7 @@ private:
     std::unique_ptr<FrameCache> frame_cache_;
     std::unique_ptr<Lut3D> look_;
     float look_strength_ = 1.f;
+    std::atomic<float> preview_scale_{1.f};
     NodeGraph comp_;
     bool comp_active_ = false;
     float grade_[10] = {0.f, 1.f, 1.f, 0.f, 0.f, 1.f, 1.f, 0.f, 0.f, 0.f};

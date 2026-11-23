@@ -1,5 +1,46 @@
 # Changelog
 
+## Unreleased — preview pan/zoom mode and preview quality
+
+### Added
+- **Explicit pan/zoom mode.** The viewport now carries a visible **PAN / ZOOM** toggle,
+  the mode the Alight Motion reference describes. With it on, two fingers always pan and
+  pinch the canvas, and one finger pans at any zoom; the pinch keeps the point under the
+  fingers fixed instead of zooming around the view centre
+- **Two-finger layer transform.** With the toggle off and a layer selected, a two-finger
+  gesture moves and scales that layer instead of the canvas: the centroid drag becomes a
+  position offset, the pinch becomes a scale factor, and the gesture commits position and
+  scale keyframes at the playhead on release, so it is one undo step and Motion sees
+  exactly the values the gesture produced. A readout over the viewport reports the
+  accumulated offset and percentage while the fingers are down. With nothing selected,
+  the toggle off still pans the canvas, because there is no ambiguity to resolve
+- **Preview quality as its own setting.** Settings → Preview and Session → **Preview
+  quality** offer Full, Half and Quarter. The engine composites the frame at 100%, 50% or
+  25% of the canvas (`Engine::set_preview_scale`, `ms_preview_scale_set`, bridged to
+  `NativeEngine.nativePreviewScaleSet`), so a heavy scene previews at a quarter of the
+  pixels without touching the document. The setting is persisted on the device and
+  restored at start-up
+- **Delivery stays full size.** `render_frame` reports its composite size separately from
+  the project canvas, so   the preview bitmap follows the quality setting without changing
+  what export means. The PNG still export and the MP4 encoder force scale 1 and restore
+  the preview scale afterwards, so neither is ever delivered at the reduced size
+
+### Verified
+- `ms_preview_quality_test` (new, in `ctest`): full quality reports and renders the 640×360
+  canvas; half quality reports and copies a 320×180 frame; the preview state still reports
+  the 640×360 project canvas; changing quality changes the render signature, so the frame
+  cache cannot serve the old size; the scale clamps at 25%. Native suite: **28/29**, with
+  `ms_audio_playback_test` still the only failure because this container has no `ffmpeg`
+  CLI for its fixtures
+- `:app:assembleDebug` succeeds with the new JNI entry points and the Compose changes
+- Not verified: no device or emulator here, so the gesture modes, the pinch feel, the
+  layer-transform keyframes and the visible quality change were not exercised by hand
+
+### Provenance
+Behaviour described here comes from Alight Creative's public documentation and from this
+project's own implementation. No code, string, curve table or asset is taken from another
+editor.
+
 ## Unreleased — layer parenting and null objects
 
 ### Added

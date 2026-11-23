@@ -2,9 +2,11 @@ package com.motionstudio.app.ui
 
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,8 +15,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -36,6 +40,8 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.motionstudio.app.data.PreviewQuality
+import com.motionstudio.app.data.PreviewQualityStore
 import com.motionstudio.app.data.SettingsStore
 import com.motionstudio.app.diag.Diagnostics
 import com.motionstudio.app.native.NativeEngine
@@ -114,6 +120,31 @@ fun SettingsScreen(settings: SettingsStore, onBack: () -> Unit) {
                 Switch(
                     checked = settings.autosaveEnabled,
                     onCheckedChange = { settings.setAutosave(it) },
+                )
+            }
+        }
+
+        Section("Preview") {
+            Column(Modifier.padding(horizontal = 16.dp)) {
+                Row(
+                    Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    PreviewQuality.entries.forEach { quality ->
+                        QualityChip(
+                            label = quality.label,
+                            selected = PreviewQualityStore.quality == quality,
+                            onClick = { PreviewQualityStore.set(quality) },
+                        )
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    PreviewQualityStore.quality.detail +
+                        ". Preview quality only changes what you see while editing — export " +
+                        "always renders the project canvas in full.",
+                    color = MsColors.textTertiary,
+                    fontSize = 11.sp,
                 )
             }
         }
@@ -215,6 +246,26 @@ private fun InfoRow(label: String, value: String, valueColor: Color) {
         Text(label, color = MsColors.textSecondary, fontSize = 12.sp, modifier = Modifier.weight(1f))
         Text(value, color = valueColor, fontSize = 12.sp, fontFamily = MsFonts.mono)
     }
+}
+
+@Composable
+private fun QualityChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    Text(
+        label,
+        color = if (selected) MsColors.accentSoft else MsColors.textSecondary,
+        fontSize = 12.sp,
+        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+        modifier = Modifier
+            .heightIn(min = 36.dp)
+            .background(if (selected) MsColors.accentDim.copy(alpha = 0.55f) else MsColors.surfaceHigh, RoundedCornerShape(6.dp))
+            .border(
+                1.dp,
+                if (selected) MsColors.accent else MsColors.border,
+                RoundedCornerShape(6.dp),
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 9.dp),
+    )
 }
 
 @Composable

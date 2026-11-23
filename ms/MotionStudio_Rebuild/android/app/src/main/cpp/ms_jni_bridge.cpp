@@ -182,6 +182,28 @@ Java_com_motionstudio_app_native_NativeEngine_nativeRedo(JNIEnv*, jobject) {
     return ms_redo() == 0 ? JNI_TRUE : JNI_FALSE;
 }
 
+JNIEXPORT jfloat JNICALL
+Java_com_motionstudio_app_native_NativeEngine_nativePreviewScale(JNIEnv*, jobject) {
+    return static_cast<jfloat>(ms_preview_scale());
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_motionstudio_app_native_NativeEngine_nativePreviewScaleSet(JNIEnv*, jobject, jfloat scale) {
+    return ms_preview_scale_set(static_cast<float>(scale)) == 0 ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_motionstudio_app_native_NativeEngine_nativePreviewFrameSize(JNIEnv* env, jobject,
+                                                                    jintArray out) {
+    if (!out || env->GetArrayLength(out) < 2) return JNI_FALSE;
+    int w = 0;
+    int h = 0;
+    if (ms_preview_frame_size(&w, &h) != 0) return JNI_FALSE;
+    const jint values[2] = {w, h};
+    env->SetIntArrayRegion(out, 0, 2, values);
+    return JNI_TRUE;
+}
+
 JNIEXPORT jdoubleArray JNICALL
 Java_com_motionstudio_app_native_NativeEngine_nativePreviewState(JNIEnv* env, jobject) {
     MSAudioState unused{};

@@ -144,6 +144,11 @@ target_link_libraries(ms_parent_test PRIVATE motionstudio_native)
 target_include_directories(ms_parent_test PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
+add_executable(ms_preview_quality_test tools/ms_preview_quality_test.cpp)
+target_link_libraries(ms_preview_quality_test PRIVATE motionstudio_native)
+target_include_directories(ms_preview_quality_test PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
 add_executable(ms_mask_test tools/ms_mask_test.cpp)
 target_link_libraries(ms_mask_test PRIVATE motionstudio_native)
 target_include_directories(ms_mask_test PRIVATE
@@ -226,6 +231,7 @@ add_test(NAME ms_edit_test COMMAND ms_edit_test)
 add_test(NAME ms_proxy_test COMMAND ms_proxy_test)
 add_test(NAME ms_adjustment_test COMMAND ms_adjustment_test)
 add_test(NAME ms_parent_test COMMAND ms_parent_test)
+add_test(NAME ms_preview_quality_test COMMAND ms_preview_quality_test)
 add_test(NAME ms_mask_test COMMAND ms_mask_test)
 add_test(NAME ms_grade_test COMMAND ms_grade_test)
 add_test(NAME ms_clip_look_test COMMAND ms_clip_look_test)

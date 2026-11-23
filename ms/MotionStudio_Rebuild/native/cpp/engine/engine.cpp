@@ -200,8 +200,16 @@ bool Engine::render_frame() {
     // can leave the clip count unchanged (a trim, a move, an undo of either) and
     // would otherwise reuse a stale frame.
     const uint64_t revision = impl_->revision.load();
+    // The composite is produced at the preview scale, so a cached frame from a
+    // different quality is not reusable even at the same playhead.
+    int preview_w = 0;
+    int preview_h = 0;
+    preview_frame_size(&preview_w, &preview_h);
+    const uint64_t scale_bits =
+        static_cast<uint64_t>(std::lround(preview_scale_.load() * 1000.f));
     CacheKey key{fi, revision ^ (static_cast<uint64_t>(project_->clip_count()) << 48) ^
-                         (static_cast<uint64_t>(project_->tracks().size()) << 56)};
+                         (static_cast<uint64_t>(project_->tracks().size()) << 56) ^
+                         (scale_bits << 20)};
     bool hit = frame_cache_->get(key, *last_frame_);
     if (!hit) {
         Error e = Error::success();
@@ -209,16 +217,17 @@ bool Engine::render_frame() {
             // Cook the timeline first: every Read/Viewer source in the comp sees
             // the sequence at this time, so a comp can be built from the edit.
             ImageBuffer sequence;
-            e = player_->render_frame(impl_->current_time.load(), sequence);
+            e = player_->render_frame_at(impl_->current_time.load(), sequence, preview_w, preview_h);
             if (e.ok()) {
                 impl_->comp_sequence.copy_from(sequence);
                 impl_->comp_sequence_rev = revision;
                 impl_->comp_sequence_frame = fi;
                 e = comp_.evaluate(comp_.sink_id(), impl_->current_time.load(),
-                                   impl_->width, impl_->height, *last_frame_);
+                                   preview_w, preview_h, *last_frame_);
             }
         } else {
-            e = player_->render_frame(impl_->current_time.load(), *last_frame_);
+            e = player_->render_frame_at(impl_->current_time.load(), *last_frame_,
+                                         preview_w, preview_h);
         }
         if (!e.ok()) return false;
         frame_cache_->put(key, *last_frame_);
@@ -259,6 +268,27 @@ bool Engine::copy_last_frame(void* rgba, size_t bytes) const {
 size_t Engine::last_frame_bytes() const {
     if (!last_frame_->valid()) return 0;
     return static_cast<size_t>(last_frame_->stride()) * static_cast<size_t>(last_frame_->height());
+}
+
+void Engine::set_preview_scale(float scale) {
+    if (!std::isfinite(scale)) return;
+    // Only the next render has to change size; the frame cache key carries the
+    // scale, so no cache surgery is needed from the UI thread.
+    preview_scale_.store(std::clamp(scale, 0.25f, 1.f));
+}
+
+void Engine::preview_frame_size(int* width, int* height) const {
+    const int baseW = project_->meta().width;
+    const int baseH = project_->meta().height;
+    const float scale = preview_scale_.load();
+    // Even dimensions keep the halves of a downscaled frame from landing on a
+    // half pixel when the host draws it back into the viewport.
+    int w = static_cast<int>(std::lround(baseW * static_cast<double>(scale)));
+    int h = static_cast<int>(std::lround(baseH * static_cast<double>(scale)));
+    w = std::max(16, w & ~1);
+    h = std::max(16, h & ~1);
+    if (width) *width = w;
+    if (height) *height = h;
 }
 
 bool Engine::load_look(const std::string& path) {
@@ -302,6 +332,8 @@ unsigned long long Engine::render_signature() const {
 
     mix(static_cast<unsigned long long>(impl_->frame_index.load()));
     mix(impl_->revision.load());
+    // A quality change must produce a new frame even though the edit did not move.
+    mix(static_cast<unsigned long long>(std::lround(preview_scale_.load() * 1000.f)));
     mix(static_cast<unsigned long long>(project_->clip_count()));
     mix(static_cast<unsigned long long>(project_->tracks().size()));
     mix(impl_->playing.load() ? 1ull : 0ull);

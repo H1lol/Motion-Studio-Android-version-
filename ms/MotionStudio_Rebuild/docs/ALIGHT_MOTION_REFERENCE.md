@@ -113,10 +113,15 @@ on the effect library. Minimum device requirement is 1.5 GB RAM.
    control layer with no pixels, and the player composes the parent chain's translation and
    scale per frame (`ms_parent_test`). Opacity is intentionally not inherited. The UI row
    lives in Motion; Session adds the null.
-3. **Make pan/zoom explicit** in the viewport so a two-finger gesture is never ambiguous.
-   Still open.
-4. **Expose preview quality separately from export**; Motion Studio has proxies, so
-   surface them as a quality control rather than a hidden cache.
+3. **Pan/zoom is explicit — landed.** The viewport has a visible PAN / ZOOM toggle. On, two
+   fingers pan and pinch the canvas. Off with a layer selected, a two-finger gesture moves
+   and scales that layer and commits position and scale keys at the playhead; off with
+   nothing selected it falls back to canvas panning. The only documented gesture left out
+   is two-finger double-tap recentre, which the app does not need yet.
+4. **Preview quality — landed.** Full / Half / Quarter in Settings and Session set the
+   composite scale (100/50/25%) in the engine; proxies remain the separate, automatic
+   decode path. Export and the still export force full resolution, so the setting cannot
+   leak into delivery.
 5. **Ship a share package** for a project: one archive, one link.
 6. **Copy behaviour, never content.** The provenance rule in `CHANGELOG.md` applies to
    effect names, parameter text, curves and shaders too. Everything above is described in

@@ -8,7 +8,6 @@ import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.RectF
 import android.view.MotionEvent
-import android.view.ScaleGestureDetector
 import android.view.View
 import com.motionstudio.app.editor.EditorEngine
 import com.motionstudio.app.model.PreviewRatio
@@ -87,16 +86,42 @@ class PreviewView(context: Context) : View(context) {
     private var lastX = 0f
     private var lastY = 0f
 
-    private val scaleDetector = ScaleGestureDetector(
-        context,
-        object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
-            override fun onScale(detector: ScaleGestureDetector): Boolean {
-                scale = (scale * detector.scaleFactor).coerceIn(0.5f, 6f)
-                invalidate()
-                return true
-            }
-        }
-    )
+    // ---- Gesture mode ------------------------------------------------------
+    //
+    // The viewport has two jobs and a two-finger gesture cannot mean both at
+    // once. [navigateMode] (the visible PAN / ZOOM toggle) always pans and
+    // pinches the canvas. With the toggle off, a selected layer takes the
+    // two-finger gesture and the canvas is only reachable when nothing is
+    // selected — the ambiguity the explicit mode exists to remove.
+    private var navigateMode = false
+    private var layerTransformEnabled = false
+
+    /** Called once per two-finger layer gesture: dx/dy as fractions of the frame, relative scale. */
+    var onLayerTransform: ((dxFraction: Float, dyFraction: Float, scaleFactor: Float) -> Unit)? = null
+
+    private var twoFinger = false
+    private var oneFingerPan = false
+    private var lastCentroidX = 0f
+    private var lastCentroidY = 0f
+    private var lastSpan = 0f
+    private var gestureDx = 0f
+    private var gestureDy = 0f
+    private var gestureScale = 1f
+    private var gestureActive = false
+
+    /** Size of the composite as last drawn, so gestures can speak in canvas fractions. */
+    private var drawnFrameW = 0f
+    private var drawnFrameH = 0f
+
+    private val hudPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#E6FFFFFF")
+        textSize = 26f
+        letterSpacing = 0.04f
+        textAlign = Paint.Align.CENTER
+    }
+    private val hudBgPaint = Paint().apply { color = Color.parseColor("#B3000000") }
+
+    private val frameSize = IntArray(2)
 
     fun attach(editor: EditorEngine) {
         engine = editor
@@ -168,8 +193,11 @@ class PreviewView(context: Context) : View(context) {
 
         val state = NativeEngine.nativePreviewState()
         if (state.size < 4) return false
-        val w = state[1].toInt().coerceAtLeast(1)
-        val h = state[2].toInt().coerceAtLeast(1)
+        // The frame size follows the preview-quality setting, not the project
+        // canvas; the engine reports what it will actually composite.
+        if (!NativeEngine.nativePreviewFrameSize(frameSize)) return false
+        val w = frameSize[0].coerceAtLeast(1)
+        val h = frameSize[1].coerceAtLeast(1)
 
         if (!NativeEngine.nativeRenderFrame()) return false
 
@@ -263,19 +291,65 @@ class PreviewView(context: Context) : View(context) {
 
             canvas.drawBitmap(bitmap, src, dst, bitmapPaint)
             canvas.drawRect(dst, borderPaint)
+            drawnFrameW = dst.width()
+            drawnFrameH = dst.height()
+        }
+
+        // While a layer gesture is in flight the picture only updates on release,
+        // so the readout is the feedback: without it the two fingers feel dead.
+        if (gestureActive && !navigating()) {
+            val label = buildString {
+                append("LAYER  ")
+                append("%+.0f, %+.0f px".format(gestureDx * drawnFrameW, gestureDy * drawnFrameH))
+                append("  ·  ")
+                append("%.0f%%".format(gestureScale * 100f))
+            }
+            val cx = width / 2f
+            val cy = height - 34f
+            val half = hudPaint.measureText(label) / 2f + 14f
+            canvas.drawRoundRect(cx - half, cy - 22f, cx + half, cy + 10f, 6f, 6f, hudBgPaint)
+            canvas.drawText(label, cx, cy, hudPaint)
         }
     }
 
+    /** The visible PAN / ZOOM toggle: two-finger gestures always move the canvas. */
+    fun setNavigateMode(on: Boolean) {
+        if (navigateMode == on) return
+        navigateMode = on
+        cancelGesture()
+        invalidate()
+    }
+
+    /** True when a layer is selected and the toggle is off, so gestures edit it. */
+    fun setLayerTransformEnabled(on: Boolean) {
+        if (layerTransformEnabled == on) return
+        layerTransformEnabled = on
+        if (on) cancelGesture()
+        invalidate()
+    }
+
+    private fun navigating(): Boolean = navigateMode || !layerTransformEnabled
+
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        scaleDetector.onTouchEvent(event)
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 lastX = event.x
                 lastY = event.y
+                twoFinger = false
+                oneFingerPan = navigating()
+                resetAccumulators()
                 parent?.requestDisallowInterceptTouchEvent(true)
             }
+            MotionEvent.ACTION_POINTER_DOWN -> {
+                if (event.pointerCount >= 2) beginTwoFinger(event)
+            }
             MotionEvent.ACTION_MOVE -> {
-                if (!scaleDetector.isInProgress && scale > 1.01f) {
+                if (event.pointerCount >= 2) {
+                    if (!twoFinger) beginTwoFinger(event)
+                    updateTwoFinger(event)
+                } else if (oneFingerPan) {
+                    // In PAN / ZOOM mode one finger pans at any zoom, so the
+                    // mode is usable without pinching first.
                     offsetX += event.x - lastX
                     offsetY += event.y - lastY
                     lastX = event.x
@@ -283,7 +357,21 @@ class PreviewView(context: Context) : View(context) {
                     invalidate()
                 }
             }
+            MotionEvent.ACTION_POINTER_UP -> {
+                if (twoFinger) endTwoFinger()
+                // A finger left the screen: re-anchor the one-finger pan instead
+                // of letting the remaining pointer jump the canvas.
+                val remaining = (0 until event.pointerCount).firstOrNull {
+                    it != event.actionIndex
+                }
+                if (remaining != null) {
+                    lastX = event.getX(remaining)
+                    lastY = event.getY(remaining)
+                    oneFingerPan = navigating()
+                }
+            }
             MotionEvent.ACTION_UP -> {
+                if (twoFinger) endTwoFinger()
                 parent?.requestDisallowInterceptTouchEvent(false)
                 // The view handles its own touches, so it must answer the
                 // accessibility click action too; a screen reader's "activate"
@@ -292,9 +380,89 @@ class PreviewView(context: Context) : View(context) {
             }
             MotionEvent.ACTION_CANCEL -> {
                 parent?.requestDisallowInterceptTouchEvent(false)
+                cancelGesture()
             }
         }
         return true
+    }
+
+    private fun beginTwoFinger(event: MotionEvent) {
+        twoFinger = true
+        oneFingerPan = false
+        lastCentroidX = (event.getX(0) + event.getX(1)) / 2f
+        lastCentroidY = (event.getY(0) + event.getY(1)) / 2f
+        lastSpan = spread(event)
+    }
+
+    private fun updateTwoFinger(event: MotionEvent) {
+        val cx = (event.getX(0) + event.getX(1)) / 2f
+        val cy = (event.getY(0) + event.getY(1)) / 2f
+        val span = spread(event)
+        val dx = cx - lastCentroidX
+        val dy = cy - lastCentroidY
+        val factor = if (lastSpan > 1f && span > 1f) (span / lastSpan).coerceIn(0.5f, 2f) else 1f
+        lastCentroidX = cx
+        lastCentroidY = cy
+        lastSpan = span
+
+        if (navigating()) {
+            offsetX += dx
+            offsetY += dy
+            applyZoom(factor, cx, cy)
+            return
+        }
+
+        // A layer transform: accumulate and commit on release. Live-compositing
+        // every move would re-render the frame faster than the fingers move.
+        val frameW = if (drawnFrameW > 1f) drawnFrameW else width.toFloat().coerceAtLeast(1f)
+        val frameH = if (drawnFrameH > 1f) drawnFrameH else height.toFloat().coerceAtLeast(1f)
+        gestureDx += dx / frameW
+        gestureDy += dy / frameH
+        gestureScale = (gestureScale * factor).coerceIn(0.05f, 20f)
+        gestureActive = true
+        invalidate()
+    }
+
+    private fun endTwoFinger() {
+        if (gestureActive && !navigating()) {
+            onLayerTransform?.invoke(gestureDx, gestureDy, gestureScale)
+        }
+        twoFinger = false
+        cancelGesture()
+    }
+
+    private fun cancelGesture() {
+        twoFinger = false
+        oneFingerPan = false
+        gestureActive = false
+        resetAccumulators()
+        invalidate()
+    }
+
+    private fun resetAccumulators() {
+        gestureDx = 0f
+        gestureDy = 0f
+        gestureScale = 1f
+    }
+
+    private fun spread(event: MotionEvent): Float {
+        val dx = event.getX(0) - event.getX(1)
+        val dy = event.getY(0) - event.getY(1)
+        return kotlin.math.hypot(dx, dy)
+    }
+
+    /** Pinch around the point under the fingers instead of the view centre. */
+    private fun applyZoom(factor: Float, focusX: Float, focusY: Float) {
+        if (!factor.isFinite() || factor <= 0f) return
+        val next = (scale * factor).coerceIn(0.5f, 6f)
+        if (kotlin.math.abs(next - scale) < 1e-4f) return
+        val ratio = next / scale
+        val cx = width / 2f
+        val cy = height / 2f
+        offsetX = (focusX - cx) - (focusX - cx - offsetX) * ratio
+        offsetY = (focusY - cy) - (focusY - cy - offsetY) * ratio
+        scale = next
+        invalidate()
     }
 
     override fun performClick(): Boolean {
@@ -306,6 +474,7 @@ class PreviewView(context: Context) : View(context) {
         scale = 1f
         offsetX = 0f
         offsetY = 0f
+        cancelGesture()
         invalidate()
     }
 

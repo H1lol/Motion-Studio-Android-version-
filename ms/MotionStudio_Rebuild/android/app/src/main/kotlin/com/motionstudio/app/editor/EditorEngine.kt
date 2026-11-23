@@ -803,6 +803,53 @@ class EditorEngine(
 
     // ---- Canvas / preview shape --------------------------------------------
 
+    /**
+     * Two-finger canvas transform of the selected layer, committed from the
+     * preview on gesture release: [dxFraction] and [dyFraction] are shares of
+     * the displayed frame, [scaleFactor] is relative to the current scale.
+     *
+     * The transform is written as position and scale keyframes at the playhead,
+     * so it is undoable like any other edit and a later Motion edit sees exactly
+     * the values the gesture produced.
+     */
+    fun transformSelectedLayer(dxFraction: Float, dyFraction: Float, scaleFactor: Float): Boolean {
+        val moved = kotlin.math.abs(dxFraction) > 1e-4f || kotlin.math.abs(dyFraction) > 1e-4f
+        val scaled = kotlin.math.abs(scaleFactor - 1f) > 1e-3f
+        if (!moved && !scaled) return true
+        val (t, c) = selection() ?: run {
+            status = "Select a layer first"
+            return false
+        }
+        val clip = doc.clipById(t, c) ?: return false
+        if (time < clip.start || time > clip.end) {
+            status = "Move the playhead onto the selected layer first"
+            return false
+        }
+        val local = (time - clip.start).coerceAtLeast(0.0)
+        val px = sampledMotion(t, c, 2, local) + dxFraction * doc.width
+        val py = sampledMotion(t, c, 3, local) + dyFraction * doc.height
+        val scale = (sampledMotion(t, c, 1, local, 1.0) * scaleFactor).coerceIn(0.02, 20.0)
+        if (!NativeEngine.nativeKeyframeAdd(t, c, 2, local, px)) return false
+        if (!NativeEngine.nativeKeyframeAdd(t, c, 3, local, py)) return false
+        if (!NativeEngine.nativeKeyframeAdd(t, c, 1, local, scale)) return false
+        markDirty()
+        reload()
+        status = "Moved ${clip.name.ifBlank { "layer" }} — position and scale keyed at " +
+            formatTimecode(time)
+        return true
+    }
+
+    /** Value of a motion channel at a clip-local time, or [fallback] when unanimated. */
+    private fun sampledMotion(track: Int, clip: Int, prop: Int, local: Double, fallback: Double = 0.0): Double {
+        if (NativeEngine.nativeKeyframeCount(track, clip, prop) <= 0) return fallback
+        val out = FloatArray(2)
+        return if (NativeEngine.nativeKeyframeSample(track, clip, prop, local, local + 1e-4, out, 2)) {
+            out[0].toDouble()
+        } else {
+            fallback
+        }
+    }
+
     /** Aspect guide drawn by the preview; [PreviewRatio.Project] follows the frame. */
     var previewRatio by mutableStateOf(com.motionstudio.app.model.PreviewRatio.Project)
 

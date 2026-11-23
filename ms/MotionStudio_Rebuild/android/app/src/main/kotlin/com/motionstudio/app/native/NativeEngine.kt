@@ -77,6 +77,13 @@ object NativeEngine {
     external fun nativeFrameBytes(): Long
     external fun nativeCopyFrame(bitmap: Bitmap): Boolean
 
+    // Preview quality: a composite scale (0.25..1) applied to the preview only.
+    // Export forces it back to 1 so the delivered master stays full-size.
+    external fun nativePreviewScale(): Float
+    external fun nativePreviewScaleSet(scale: Float): Boolean
+    /** Size of the frame the preview currently produces, into [w, h]. */
+    external fun nativePreviewFrameSize(out: IntArray): Boolean
+
     // Proxy media: preview decodes the registered stand-in, export turns proxies
     // off first so the delivered master always comes from the source file.
     external fun nativeProxyRegister(media: String, proxy: String): Boolean

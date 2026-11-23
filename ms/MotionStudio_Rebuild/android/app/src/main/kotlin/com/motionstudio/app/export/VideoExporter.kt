@@ -80,6 +80,10 @@ class VideoExporter(private val engine: EditorEngine) {
         // The engine reopens its decoders when this flips, and the finally block
         // puts proxies back for the preview.
         val proxiesWereOn = NativeEngine.available && NativeEngine.nativeProxySetEnabled(false)
+        // Delivery is never reduced by the preview-quality setting; the finally
+        // block puts the editor's preview scale back.
+        val previewScaleWas = NativeEngine.nativePreviewScale()
+        if (previewScaleWas < 0.999f) NativeEngine.nativePreviewScaleSet(1f)
 
         var videoCodec: MediaCodec? = firstEncoder
         var audioCodec: MediaCodec? = null
@@ -321,6 +325,7 @@ class VideoExporter(private val engine: EditorEngine) {
             if (muxerStarted) runCatching { muxer?.stop() }
             runCatching { muxer?.release() }
             if (proxiesWereOn) NativeEngine.nativeProxySetEnabled(true)
+            if (previewScaleWas < 0.999f) NativeEngine.nativePreviewScaleSet(previewScaleWas)
             engine.seek(resumeTime)
             if (wasPlaying) engine.togglePlay()
         }

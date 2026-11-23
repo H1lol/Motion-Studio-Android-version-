@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -410,10 +411,29 @@ private fun WorkspaceTabs(selected: Workspace, onSelect: (Workspace) -> Unit) {
 
 @Composable
 private fun Viewport(engine: EditorEngine, modifier: Modifier = Modifier) {
+    // The explicit pan/zoom mode from the Alight reference: with it on, two
+    // fingers always move the canvas; with it off and a layer selected, they
+    // move the layer instead.
+    var navigate by remember { mutableStateOf(false) }
+    // Read here, outside the AndroidView update lambda, so a selection change
+    // recomposes the viewport and pushes the new gesture mode into the view.
+    val layerSelected = engine.selectedClipId > 0
+
     Column(modifier.fillMaxWidth().background(MsColors.viewerBg)) {
         Box(Modifier.fillMaxWidth().weight(1f)) {
             AndroidView(
-                factory = { context -> PreviewView(context).also { it.attach(engine) } },
+                factory = { context ->
+                    PreviewView(context).also { view ->
+                        view.attach(engine)
+                        view.onLayerTransform = { dx, dy, scale ->
+                            engine.transformSelectedLayer(dx, dy, scale)
+                        }
+                    }
+                },
+                update = { view ->
+                    view.setNavigateMode(navigate)
+                    view.setLayerTransformEnabled(layerSelected)
+                },
                 modifier = Modifier.fillMaxSize(),
             )
             // Framing marks, not a box: four corner rules say where the canvas
@@ -475,19 +495,48 @@ private fun Viewport(engine: EditorEngine, modifier: Modifier = Modifier) {
             ) {
                 ViewportClock(engine)
             }
-            engine.lookName?.let { look ->
+            Row(
+                Modifier.align(Alignment.BottomEnd).padding(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                engine.lookName?.let { look ->
+                    Box(
+                        Modifier
+                            .background(MsColors.background.copy(alpha = 0.72f))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            "LUT ${look.uppercase()}",
+                            color = MsColors.info,
+                            fontSize = 9.sp,
+                            fontFamily = MsFonts.mono,
+                        )
+                    }
+                }
                 Box(
                     Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(8.dp)
-                        .background(MsColors.background.copy(alpha = 0.72f))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                        .heightIn(min = 30.dp)
+                        .clip(RoundedCornerShape(5.dp))
+                        .background(
+                            if (navigate) MsColors.accentDim.copy(alpha = 0.85f)
+                            else MsColors.background.copy(alpha = 0.72f)
+                        )
+                        .border(
+                            1.dp,
+                            if (navigate) MsColors.accent else MsColors.border,
+                            RoundedCornerShape(5.dp),
+                        )
+                        .clickable { navigate = !navigate }
+                        .padding(horizontal = 9.dp, vertical = 5.dp),
+                    contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        "LUT ${look.uppercase()}",
-                        color = MsColors.info,
+                        "PAN / ZOOM",
+                        color = if (navigate) MsColors.accentSoft else MsColors.textSecondary,
                         fontSize = 9.sp,
                         fontFamily = MsFonts.mono,
+                        fontWeight = if (navigate) FontWeight.Bold else FontWeight.Normal,
                     )
                 }
             }

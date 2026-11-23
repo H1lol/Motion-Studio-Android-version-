@@ -41,6 +41,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.motionstudio.app.data.PreviewQuality
+import com.motionstudio.app.data.PreviewQualityStore
 import com.motionstudio.app.editor.EditorEngine
 import com.motionstudio.app.export.ExportSettings
 import com.motionstudio.app.media.ProxyGenerator
@@ -190,6 +192,29 @@ fun MoreSheet(
             }
             Text(
                 "Guide only: the delivery crop is shaded, the composite is never cut.",
+                color = MsColors.textMuted,
+                fontSize = 10.sp,
+            )
+
+            Spacer(Modifier.height(10.dp))
+            SheetSection("PREVIEW QUALITY")
+            Row(
+                Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                PreviewQuality.entries.forEach { quality ->
+                    SessionChip(
+                        "${quality.label} ${(quality.scale * 100).toInt()}%",
+                        PreviewQualityStore.quality == quality,
+                    ) {
+                        PreviewQualityStore.set(quality)
+                    }
+                }
+            }
+            Text(
+                PreviewQualityStore.quality.detail +
+                    ". A preview setting, not a delivery one: export always renders the " +
+                    "project canvas in full.",
                 color = MsColors.textMuted,
                 fontSize = 10.sp,
             )
@@ -378,19 +403,29 @@ private fun SessionChip(label: String, selected: Boolean, onClick: () -> Unit) {
 fun exportCurrentFrame(context: Context, engine: EditorEngine): File? {
     val state = NativeEngine.nativePreviewState()
     if (state.size < 4) return null
-    val width = state[1].toInt()
-    val height = state[2].toInt()
-    if (width <= 0 || height <= 0) return null
-    if (!NativeEngine.nativeRenderFrame()) return null
+    // A still is delivery, not preview: render at the project canvas even when
+    // the preview-quality setting is reduced.
+    val previewScale = NativeEngine.nativePreviewScale()
+    val frameSize = IntArray(2)
+    return try {
+        if (previewScale < 0.999f) NativeEngine.nativePreviewScaleSet(1f)
+        if (!NativeEngine.nativePreviewFrameSize(frameSize)) return null
+        val width = frameSize[0]
+        val height = frameSize[1]
+        if (width <= 0 || height <= 0) return null
+        if (!NativeEngine.nativeRenderFrame()) return null
 
-    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-    if (!NativeEngine.nativeCopyFrame(bitmap)) return null
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        if (!NativeEngine.nativeCopyFrame(bitmap)) return null
 
-    val dir = File(context.filesDir, "exports").apply { mkdirs() }
-    val target = File(dir, "frame_${System.currentTimeMillis()}.png")
-    FileOutputStream(target).use { out ->
-        bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+        val dir = File(context.filesDir, "exports").apply { mkdirs() }
+        val target = File(dir, "frame_${System.currentTimeMillis()}.png")
+        FileOutputStream(target).use { out ->
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+        }
+        bitmap.recycle()
+        target
+    } finally {
+        if (previewScale < 0.999f) NativeEngine.nativePreviewScaleSet(previewScale)
     }
-    bitmap.recycle()
-    return target
 }

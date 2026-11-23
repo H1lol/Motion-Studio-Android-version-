@@ -62,6 +62,13 @@ MSPreviewState ms_get_preview_state();
 // Render one frame into the given texture / surface (platform specific)
 int ms_render_frame();
 
+// Preview quality: a composite scale in 0.25..1. It changes only what the
+// preview produces; export renders at the project canvas regardless.
+float ms_preview_scale(void);
+int ms_preview_scale_set(float scale);
+// Size of the frame ms_render_frame() now produces. False when uninitialised.
+int ms_preview_frame_size(int* width, int* height);
+
 // Timeline audio. The host audio thread pulls interleaved f32 PCM for the
 // current playhead; the master insert chain is already applied.
 typedef struct {
