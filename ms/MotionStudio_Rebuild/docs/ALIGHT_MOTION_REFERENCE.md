@@ -109,9 +109,12 @@ on the effect library. Minimum device requirement is 1.5 GB RAM.
 ## 6. What this means for Motion Studio
 
 1. **Keep the project-as-composition model** — tracks, clips, keyframes, comp network.
-2. **Add parenting and null objects.** Highest editorial value per line of engine code: a
-   `parentId` on a layer plus a transform-composition step.
+2. **Parenting and null objects — landed.** Clips carry a `parent_id`, a null object is a
+   control layer with no pixels, and the player composes the parent chain's translation and
+   scale per frame (`ms_parent_test`). Opacity is intentionally not inherited. The UI row
+   lives in Motion; Session adds the null.
 3. **Make pan/zoom explicit** in the viewport so a two-finger gesture is never ambiguous.
+   Still open.
 4. **Expose preview quality separately from export**; Motion Studio has proxies, so
    surface them as a quality control rather than a hidden cache.
 5. **Ship a share package** for a project: one archive, one link.

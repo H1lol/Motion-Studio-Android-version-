@@ -66,6 +66,12 @@ struct ClipInfo {
   // Adjustment layer: has no source of its own. Its effect stack and grade are
   // applied to everything the tracks below have already composited.
   bool is_adjustment = false;
+  // Layer parenting: 0 = none, otherwise the id of another clip whose transform
+  // drives this one. Chains are allowed; cycles are refused by the engine.
+  ClipId parent_id = 0;
+  // Null object: an invisible control layer, used as a parent or as one handle
+  // for a shared move. It exists on the timeline but never composites.
+  bool is_null = false;
   // Text / title clip (rendered by ms::render_text instead of a decoder).
   bool is_text = false;
   std::string text;

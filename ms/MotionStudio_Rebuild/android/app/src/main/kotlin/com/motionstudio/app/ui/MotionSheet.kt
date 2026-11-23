@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -168,7 +169,53 @@ fun MotionSheet(engine: EditorEngine, onDismiss: () -> Unit) {
             )
 
             Spacer(Modifier.height(14.dp))
-            val retimeTarget = clip?.takeIf { !it.isAdjustment && !it.isText }
+            val parentId = engine.clipParent
+            Text("Parent", color = MsColors.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            Text(
+                when {
+                    clip == null -> "Select a clip to parent it"
+                    parentId == 0 -> "None · this clip's transform is its own"
+                    else -> "Inherits translation and scale from clip $parentId"
+                },
+                color = MsColors.textMuted,
+                fontSize = 11.sp,
+            )
+            Row(
+                Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                TextButton(
+                    enabled = clip != null,
+                    onClick = { engine.setClipParent(0) },
+                ) {
+                    Text(
+                        "None",
+                        color = if (clip != null && parentId == 0) MsColors.accentSoft
+                        else MsColors.textMuted,
+                        fontSize = 11.sp,
+                    )
+                }
+                engine.parentCandidates().forEach { candidate ->
+                    val active = parentId == candidate.id
+                    TextButton(onClick = { engine.setClipParent(candidate.id) }) {
+                        Text(
+                            candidate.name.ifBlank { "Clip ${candidate.id}" } +
+                                if (candidate.isNull) " · null" else "",
+                            color = if (active) MsColors.accentSoft else MsColors.textSecondary,
+                            fontSize = 11.sp,
+                        )
+                    }
+                }
+            }
+            Text(
+                "Animate the parent once and every child follows. A null object is invisible: " +
+                    "add one from Session, then parent the clips you want to move together.",
+                color = MsColors.textMuted,
+                fontSize = 11.sp,
+            )
+
+            Spacer(Modifier.height(14.dp))
+            val retimeTarget = clip?.takeIf { !it.isAdjustment && !it.isText && !it.isNull }
             var speed by remember(retimeTarget?.id, retimeTarget?.speed) {
                 mutableFloatStateOf(retimeTarget?.speed?.toFloat() ?: 1f)
             }

@@ -107,6 +107,15 @@ fun MoreSheet(
                 color = MsColors.textMuted,
                 fontSize = 10.sp,
             )
+            TextButton(onClick = { engine.addNullObject() }) {
+                Text("Add null object", color = MsColors.accentSoft, fontSize = 12.sp)
+            }
+            Text(
+                "A null is an invisible control layer. Parent clips to it in Motion, " +
+                    "animate the null once, and the whole rig moves with it.",
+                color = MsColors.textMuted,
+                fontSize = 10.sp,
+            )
 
             Spacer(Modifier.height(6.dp))
             SheetSection("CANVAS RATIO")

@@ -1,5 +1,47 @@
 # Changelog
 
+## Unreleased — layer parenting and null objects
+
+### Added
+- **Parenting.** A clip can now name another clip as its parent. The child inherits the
+  parent's animated translation and scale at the playhead, and chains compose from the
+  nearest parent outwards. Parenting deliberately does not carry opacity: a control layer
+  moves a rig, it does not fade it. Each ancestor is sampled on its own clip-local clock
+  and clamped to its own range, so a parent that ends holds its last pose instead of
+  snapping back
+- **Null objects.** `add_null_clip` creates an invisible control layer with a transform
+  but no pixels. It exists on the timeline, can be keyframed and parented like any other
+  layer, and is skipped by the compositor, the frame cache and export, so it can never
+  appear in a delivered frame. This is the same rig model the released Alight Motion and
+  Nova editors describe: animate one control, parent the layers to it
+- **Engine surface.** `add_null_clip`, `set_clip_parent` and `clip_parent`, bridged as
+  `ms_null_add` / `ms_clip_parent_set` / `ms_clip_parent_get` and mirrored in JNI and
+  `EditorEngine.addNullObject` / `setClipParent` / `clipParent`. Self-parenting, an unknown
+  parent and any cycle are refused; linking and clearing are one undo step each
+- **Persistence.** Clips carry `"parent"` and `"null"` in the project JSON. The keys are
+  written for every clip, so an older document loads with no parent and documents from
+  this build stay readable by the same parser
+- **UI.** Session gains **Add null object**, Motion gains a **Parent** row listing every
+  legal parent (descendants are excluded before the engine checks again), and the clip
+  inspector reports `null · invisible control layer` and the parent id
+
+### Verified
+- `ms_parent_test` (new, in `ctest`): a null contributes zero pixels; linking a child to a
+  keyframed null moves it; the parent's scale multiplies the child's (0.5 × 2 fills more
+  of the frame); self-parenting, an unknown parent and a cycle are refused; clearing a
+  parent undoes back to the link; `parent` and `null` survive save/load. Full native suite:
+  **27/28**, with `ms_audio_playback_test` failing only because this container has no
+  `ffmpeg` CLI to generate its tone and media fixtures — not a parenting regression
+- `:app:assembleDebug` succeeds (Kotlin/Compose, JNI for both ABIs, signed APK) and
+  `:app:testDebugUnitTest` passes
+- Not verified: nothing was run on a device, so the new Parent row, the ghost null clip on
+  the timeline and the feel of an animated rig are unexercised
+
+### Provenance
+- Original work on the project's own transform compositor and `AnimCurve`. The released
+  editors' descriptions were used to choose the behaviour; no code, asset, string or
+  parameter text came from either app
+
 ## Unreleased — build verification and second interface pass
 
 ### Added

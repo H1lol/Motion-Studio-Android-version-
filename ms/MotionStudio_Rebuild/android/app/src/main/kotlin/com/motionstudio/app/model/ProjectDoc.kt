@@ -28,6 +28,10 @@ data class NativeClip(
     val speed: Double = 1.0,
     /** Adjustment layer: no pixels of its own, effects run on the tracks below. */
     val isAdjustment: Boolean = false,
+    /** Control layer: invisible, exists to drive the clips parented to it. */
+    val isNull: Boolean = false,
+    /** Parent clip id (0 = none). Parent translation and scale compose into this clip. */
+    val parent: Int = 0,
     val effects: List<NativeEffect> = emptyList(),
     val keyframes: Map<String, Int> = emptyMap(),
     val isText: Boolean = false,
@@ -198,6 +202,8 @@ data class ProjectDoc(
                                                 mute = clip.optBoolean("mute", false),
                                                 speed = clip.optDouble("speed", 1.0),
                                                 isAdjustment = clip.optBoolean("adj", false),
+                                                isNull = clip.optBoolean("null", false),
+                                                parent = clip.optInt("parent", 0),
                                                 effects = parseEffects(clip),
                                                 keyframes = parseKeyframeCounts(clip),
                                                 isText = clip.optBoolean("is_text", false),

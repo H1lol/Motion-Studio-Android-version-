@@ -248,6 +248,16 @@ int ms_clip_speed_get(int track_id, int clip_id, float* out);
 // or 0.
 int ms_adjustment_add(int track_id, double start, double duration);
 
+// Null object: an invisible control layer with a transform but no pixels, used
+// as a parent for a rig. Returns the new clip id or 0.
+int ms_null_add(int track_id, double start, double duration);
+
+// Layer parenting. `parent_clip_id` 0 clears the link; self-parenting, an
+// unknown parent and cycles are refused. 0 on success, -1 on failure.
+int ms_clip_parent_set(int track_id, int clip_id, int parent_clip_id);
+/** Writes the parent clip id (0 = none). 0 on success, -1 when unknown. */
+int ms_clip_parent_get(int track_id, int clip_id, int* out_parent);
+
 // Per-clip grade. Applied to the clip before compositing, independent of the
 // master grade. Returns 0 on success.
 int ms_clip_grade_set(int track_id, int clip_id, float exposure, float contrast,

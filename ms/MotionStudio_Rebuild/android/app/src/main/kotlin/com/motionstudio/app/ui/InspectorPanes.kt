@@ -227,14 +227,16 @@ fun ClipPane(
             InfoRow(
                 "KIND",
                 when {
+                    clip.isNull -> "null · invisible control layer"
                     clip.isAdjustment -> "adjustment · tracks below"
                     clip.isText -> "title · ${clip.textFont}"
                     else -> "media #${clip.mediaId}"
                 },
             )
-            if (!clip.isAdjustment && !clip.isText) {
+            if (!clip.isAdjustment && !clip.isText && !clip.isNull) {
                 InfoRow("SPEED", "%.2f×".format(clip.speed))
             }
+            if (clip.parent != 0) InfoRow("PARENT", "clip ${clip.parent}")
             InfoRow("EFFECTS", clip.effects.size.toString())
             Spacer(Modifier.height(8.dp))
 

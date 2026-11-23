@@ -1013,6 +1013,78 @@ class EditorEngine(
         return true
     }
 
+    /**
+     * Adds a null object at the playhead on the overlay (or first video) track.
+     * It has a transform but no pixels: parent other clips to it and animate it
+     * once to move the whole rig, the way a null works in a layer compositor.
+     */
+    fun addNullObject(duration: Double = 3.0): Boolean {
+        val track = doc.tracks.firstOrNull { it.type == 1 }
+            ?: doc.tracks.firstOrNull { it.type == 0 }
+            ?: run {
+                status = "No video or overlay track to hold a null object"
+                return false
+            }
+        val id = NativeEngine.nativeNullAdd(track.id, time, duration)
+        if (id <= 0) {
+            status = "Could not add the null object"
+            return false
+        }
+        selectedTrackId = track.id
+        selectedClipId = id
+        markDirty()
+        reload()
+        status = "Null object added — parent clips to it in Motion"
+        return true
+    }
+
+    // ---- Layer parenting ---------------------------------------------------
+
+    /** Parent clip id of the selection (0 = none). */
+    val clipParent: Int
+        get() = doc.clipById(selectedTrackId, selectedClipId)?.parent ?: 0
+
+    /**
+     * Clips that can become the selection's parent: everything except the clip
+     * itself and anything already below it, which would make a cycle. The engine
+     * checks again, so a stale list cannot corrupt a document.
+     */
+    fun parentCandidates(): List<com.motionstudio.app.model.NativeClip> {
+        val (t, c) = selection() ?: return emptyList()
+        val all = doc.tracks.flatMap { it.clips }
+        return all.filter { candidate ->
+            candidate.id != c && !isAncestorOf(candidate.id, c)
+        }
+    }
+
+    private fun isAncestorOf(candidate: Int, clip: Int): Boolean {
+        var id = candidate
+        val seen = HashSet<Int>()
+        while (id != 0 && seen.add(id)) {
+            if (id == clip) return true
+            id = doc.tracks.firstNotNullOfOrNull { track ->
+                track.clips.firstOrNull { it.id == id }?.parent
+            } ?: 0
+        }
+        return false
+    }
+
+    /** Links the selected clip to [parentClipId] (0 clears it). Undoable. */
+    fun setClipParent(parentClipId: Int): Boolean {
+        val (t, c) = selection() ?: run {
+            status = "Select a clip first"
+            return false
+        }
+        if (!NativeEngine.nativeClipParentSet(t, c, parentClipId)) {
+            status = "That parent would make a cycle"
+            return false
+        }
+        markDirty()
+        reload()
+        status = if (parentClipId == 0) "Parent cleared" else "Parent linked"
+        return true
+    }
+
     // ---- Per-clip grade ----------------------------------------------------
 
     var clipGrade by mutableStateOf(

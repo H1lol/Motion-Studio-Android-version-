@@ -238,6 +238,24 @@ int ms_adjustment_add(int track_id, double start, double duration) {
     return static_cast<int>(ms::Engine::instance().add_adjustment_clip(
         static_cast<ms::TrackId>(track_id), start, duration));
 }
+int ms_null_add(int track_id, double start, double duration) {
+    return static_cast<int>(ms::Engine::instance().add_null_clip(
+        static_cast<ms::TrackId>(track_id), start, duration));
+}
+int ms_clip_parent_set(int track_id, int clip_id, int parent_clip_id) {
+    return ms::Engine::instance().set_clip_parent(static_cast<ms::TrackId>(track_id),
+                                                  static_cast<ms::ClipId>(clip_id),
+                                                  static_cast<ms::ClipId>(parent_clip_id))
+               ? 0 : -1;
+}
+int ms_clip_parent_get(int track_id, int clip_id, int* out_parent) {
+    ms::ClipId parent = 0;
+    if (!ms::Engine::instance().clip_parent(static_cast<ms::TrackId>(track_id),
+                                            static_cast<ms::ClipId>(clip_id), &parent))
+        return -1;
+    if (out_parent) *out_parent = static_cast<int>(parent);
+    return 0;
+}
 int ms_clip_speed_set(int track_id, int clip_id, float speed) {
     return ms::Engine::instance().set_clip_speed(static_cast<ms::TrackId>(track_id),
                                                  static_cast<ms::ClipId>(clip_id), speed)

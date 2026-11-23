@@ -96,6 +96,13 @@ object NativeEngine {
     // run their effect stack over everything the tracks below composited.
     external fun nativeClipSpeedSet(trackId: Int, clipId: Int, speed: Float): Boolean
     external fun nativeAdjustmentAdd(trackId: Int, start: Double, duration: Double): Int
+
+    // Null objects and layer parenting. A null is an invisible control layer;
+    // a child inherits its parent's translation and scale at the playhead.
+    external fun nativeNullAdd(trackId: Int, start: Double, duration: Double): Int
+    external fun nativeClipParentSet(trackId: Int, clipId: Int, parentId: Int): Boolean
+    /** Parent clip id (0 = none), or -1 when the clip is unknown. */
+    external fun nativeClipParentGet(trackId: Int, clipId: Int): Int
     external fun nativeSplitClip(trackId: Int, clipId: Int, at: Double): Boolean
     external fun nativeUndo(): Boolean
     external fun nativeRedo(): Boolean

@@ -281,12 +281,51 @@ void TimelinePlayer::render_clip_into(const ClipInfo& clip, TimeSec time, int W,
 
   const float op = static_cast<float>(
       clip.opacity * (clip.motion.opacity.empty() ? 1.0 : clip.motion.opacity_at(local)));
-  const float sc = static_cast<float>(
+  float sc = static_cast<float>(
       clip.motion.scale.empty() ? 1.0 : clip.motion.scale.eval(local));
-  const float px = static_cast<float>(
+  float px = static_cast<float>(
       clip.motion.pos_x.empty() ? 0.0 : clip.motion.pos_x.eval(local));
-  const float py = static_cast<float>(
+  float py = static_cast<float>(
       clip.motion.pos_y.empty() ? 0.0 : clip.motion.pos_y.eval(local));
+
+  // Layer parenting: a child inherits its parent's animated translation and
+  // scale, and chains compose from the nearest parent outwards. Parenting does
+  // not carry opacity, matching how a rig's control layer is meant to work.
+  // Each ancestor is sampled on its own clip-local clock and clamped to its
+  // own range, so a parent that ends holds its last pose instead of snapping.
+  if (clip.parent_id != 0 && session_) {
+    float pdx = 0.f, pdy = 0.f, pscale = 1.f;
+    std::vector<ClipId> seen;
+    ClipId pid = clip.parent_id;
+    for (int depth = 0; depth < 16 && pid != 0; ++depth) {
+      bool loop = false;
+      for (ClipId s : seen) loop = loop || s == pid;
+      if (loop) break;
+      seen.push_back(pid);
+      const ClipInfo* p = nullptr;
+      for (const auto& tr : session_->tracks()) {
+        for (const auto& pc : tr.clips) {
+          if (pc.id == pid) p = &pc;
+        }
+      }
+      if (!p) break;
+      const double pmax = std::max(0.0, p->duration * p->speed - 1e-3);
+      const double pl = std::clamp((time - p->start) * p->speed, 0.0, pmax);
+      const float ax = static_cast<float>(
+          p->motion.pos_x.empty() ? 0.0 : p->motion.pos_x.eval(pl));
+      const float ay = static_cast<float>(
+          p->motion.pos_y.empty() ? 0.0 : p->motion.pos_y.eval(pl));
+      const float as = static_cast<float>(
+          p->motion.scale.empty() ? 1.0 : p->motion.scale.eval(pl));
+      pdx = ax + pdx * as;
+      pdy = ay + pdy * as;
+      pscale *= as;
+      pid = p->parent_id;
+    }
+    px = pdx + px * pscale;
+    py = pdy + py * pscale;
+    sc *= pscale;
+  }
   blit_transformed(frame, dst, op, px, py, sc);
 }
 
@@ -346,6 +385,9 @@ Error TimelinePlayer::render_frame(TimeSec t, ImageBuffer& out) {
 
     for (const auto& clip : track.clips) {
       if (t < clip.start || t >= clip.start + clip.duration) continue;
+      // A null object is a control layer only: it exists for parenting, and it
+      // must never reach the composite, the frame cache or an export.
+      if (clip.is_null) continue;
       // An adjustment layer owns no pixels: its effect stack and grade run on
       // the frame the tracks below have already built, so there is nothing to
       // blend and it is not composited over `out`. scratch_[4] is free here —

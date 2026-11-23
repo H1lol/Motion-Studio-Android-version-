@@ -339,6 +339,8 @@ std::string ProjectSession::to_json() const {
          << ", \"pan\": " << c.pan
          << ", \"mute\": " << (c.mute ? "true" : "false")
          << ", \"adj\": " << (c.is_adjustment ? "true" : "false")
+         << ", \"null\": " << (c.is_null ? "true" : "false")
+         << ", \"parent\": " << c.parent_id
          << ", \"mask_enabled\": " << (c.mask_enabled ? "true" : "false")
          // Legacy single-mask keys mirror the first mask, so an older build
          // still shows something after this document is saved by a newer one.
@@ -570,6 +572,8 @@ Error ProjectSession::load_from_json(const std::string& json) {
       c.start=extract_number(co,"start"); c.duration=extract_number(co,"duration"); c.source_in=extract_number(co,"source_in"); c.source_out=extract_number(co,"source_out");
       c.speed=(float)extract_number(co,"speed",1); c.opacity=(float)extract_number(co,"opacity",1); c.gain=(float)extract_number(co,"gain",1); c.pan=(float)extract_number(co,"pan",0);       c.mute=co.find("\"mute\": true")!=std::string::npos;
       c.is_adjustment = co.find("\"adj\": true") != std::string::npos;
+      c.is_null = co.find("\"null\": true") != std::string::npos;
+      c.parent_id = static_cast<ClipId>(extract_number(co, "parent", 0));
       c.mask_enabled = co.find("\"mask_enabled\": true") != std::string::npos;
       {
         c.masks.clear();

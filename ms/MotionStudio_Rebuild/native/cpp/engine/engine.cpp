@@ -1410,7 +1410,7 @@ bool Engine::clip_peaks(TrackId track, ClipId clip, int bins, float* out) {
     if (!t) return false;
     const ClipInfo* c = nullptr;
     for (const auto& x : t->clips) if (x.id == clip) c = &x;
-    if (!c || c->is_text) return false;
+    if (!c || c->is_text || c->is_null) return false;
     std::vector<float> peaks;
     if (!audio_->clip_peaks(*c, bins, peaks).ok()) return false;
     if (peaks.size() != static_cast<size_t>(bins)) return false;
@@ -1561,14 +1561,85 @@ ClipId Engine::add_adjustment_clip(TrackId track, TimeSec start, TimeSec duratio
     return id;
 }
 
+ClipId Engine::add_null_clip(TrackId track, TimeSec start, TimeSec duration) {
+    if (!project_) return 0;
+    if (!project_->find_track(track)) return 0;
+    project_->push_undo();
+    ClipInfo c;
+    c.name = "Null";
+    c.start = std::max(0.0, start);
+    c.duration = duration > 0.05 ? duration : 3.0;
+    c.source_out = c.duration;
+    c.is_null = true;
+    c.motion.ensure_defaults();
+    const ClipId id = project_->add_clip(track, c);
+    if (!id) return 0;
+    project_->mark_dirty();
+    invalidate_frames();
+    return id;
+}
+
+bool Engine::set_clip_parent(TrackId track, ClipId clip, ClipId parent) {
+    if (!project_) return false;
+    TrackInfo* t = project_->find_track(track);
+    if (!t) return false;
+    ClipInfo* child = nullptr;
+    for (auto& c : t->clips) {
+        if (c.id == clip) child = &c;
+    }
+    if (!child) return false;
+    if (parent == clip) return false;
+
+    auto find_any = [&](ClipId id) -> const ClipInfo* {
+        for (const auto& tr : project_->tracks())
+            for (const auto& c : tr.clips)
+                if (c.id == id) return &c;
+        return nullptr;
+    };
+
+    if (parent != 0) {
+        const ClipInfo* pc = find_any(parent);
+        if (!pc) return false;
+        // Walk the candidate's chain: if it reaches this clip, linking would
+        // make a cycle, so a rig can never drive itself.
+        ClipId walk = pc->parent_id;
+        for (int depth = 0; depth < 32 && walk != 0; ++depth) {
+            if (walk == clip) return false;
+            const ClipInfo* step = find_any(walk);
+            if (!step) break;
+            walk = step->parent_id;
+        }
+    }
+
+    if (child->parent_id == parent) return true;
+    project_->push_undo();
+    child->parent_id = parent;
+    project_->mark_dirty();
+    invalidate_frames();
+    return true;
+}
+
+bool Engine::clip_parent(TrackId track, ClipId clip, ClipId* out) const {
+    if (!out) return false;
+    for (const auto& t : project_->tracks()) {
+        if (t.id != track) continue;
+        for (const auto& c : t.clips) {
+            if (c.id != clip) continue;
+            *out = c.parent_id;
+            return true;
+        }
+    }
+    return false;
+}
+
 bool Engine::set_clip_speed(TrackId track, ClipId clip, float speed) {
     TrackInfo* t = project_->find_track(track);
     if (!t) return false;
     for (auto& c : t->clips) {
         if (c.id != clip) continue;
-        // A title rasterises to an arbitrary length and an adjustment layer has
-        // no source range at all, so neither has anything to stretch.
-        if (c.is_adjustment || c.is_text) return false;
+        // A title rasterises to an arbitrary length, an adjustment layer has no
+        // source range and a null object owns no media, so none can be retimed.
+        if (c.is_adjustment || c.is_text || c.is_null) return false;
         const float s = std::clamp(speed, 0.1f, 8.f);
         if (std::fabs(s - c.speed) < 1e-4f) return true;
         project_->push_undo();

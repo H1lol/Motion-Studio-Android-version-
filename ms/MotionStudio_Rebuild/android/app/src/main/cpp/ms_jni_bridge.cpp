@@ -140,6 +140,26 @@ Java_com_motionstudio_app_native_NativeEngine_nativeAdjustmentAdd(JNIEnv*, jobje
     return ms_adjustment_add(trackId, start, duration);
 }
 
+JNIEXPORT jint JNICALL
+Java_com_motionstudio_app_native_NativeEngine_nativeNullAdd(JNIEnv*, jobject, jint trackId,
+        jdouble start, jdouble duration) {
+    return ms_null_add(trackId, start, duration);
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_motionstudio_app_native_NativeEngine_nativeClipParentSet(JNIEnv*, jobject, jint trackId,
+        jint clipId, jint parentId) {
+    return ms_clip_parent_set(trackId, clipId, parentId) == 0 ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_motionstudio_app_native_NativeEngine_nativeClipParentGet(JNIEnv*, jobject, jint trackId,
+        jint clipId) {
+    int parent = 0;
+    if (ms_clip_parent_get(trackId, clipId, &parent) != 0) return -1;
+    return parent;
+}
+
 JNIEXPORT jboolean JNICALL
 Java_com_motionstudio_app_native_NativeEngine_nativeClipSpeedSet(JNIEnv*, jobject, jint trackId,
         jint clipId, jfloat speed) {

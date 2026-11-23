@@ -129,6 +129,23 @@ public:
     ClipId add_adjustment_clip(TrackId track, TimeSec start, TimeSec duration);
 
     /**
+     * Adds a null object: an invisible control layer with a transform but no
+     * pixels. Parent other clips to it to move them as one rig. It never
+     * composites, so it cannot appear in preview or export.
+     */
+    ClipId add_null_clip(TrackId track, TimeSec start, TimeSec duration);
+
+    /**
+     * Points a clip at a parent clip (0 clears it). The child inherits the
+     * parent's animated translation and scale at the current time, and chains
+     * compose. Self-parenting, an unknown parent and any cycle are refused.
+     * Undoable.
+     */
+    bool set_clip_parent(TrackId track, ClipId clip, ClipId parent);
+    /** Reads the parent id (0 = none); false when the clip is unknown. */
+    bool clip_parent(TrackId track, ClipId clip, ClipId* out) const;
+
+    /**
      * Retimes a clip: the same slice of source plays at `speed` (clamped to
      * 0.1..8) and the clip's timeline length follows it. Text and adjustment
      * clips have no source range and are rejected.
