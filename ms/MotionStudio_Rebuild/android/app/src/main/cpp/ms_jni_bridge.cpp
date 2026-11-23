@@ -217,6 +217,18 @@ Java_com_motionstudio_app_native_NativeEngine_nativePreviewHitTest(JNIEnv* env, 
     return JNI_TRUE;
 }
 
+JNIEXPORT jboolean JNICALL
+Java_com_motionstudio_app_native_NativeEngine_nativePreviewClipBounds(JNIEnv* env, jobject,
+        jint track, jint clip, jfloatArray out) {
+    if (!out || env->GetArrayLength(out) < 4) return JNI_FALSE;
+    float box[4] = {0.f, 0.f, 0.f, 0.f};
+    if (ms_preview_clip_bounds(static_cast<int>(track), static_cast<int>(clip), box) != 0)
+        return JNI_FALSE;
+    const jfloat values[4] = {box[0], box[1], box[2], box[3]};
+    env->SetFloatArrayRegion(out, 0, 4, values);
+    return JNI_TRUE;
+}
+
 JNIEXPORT jdoubleArray JNICALL
 Java_com_motionstudio_app_native_NativeEngine_nativePreviewState(JNIEnv* env, jobject) {
     MSAudioState unused{};

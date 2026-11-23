@@ -66,6 +66,13 @@ public:
      */
     bool preview_hit_test(float nx, float ny, TrackId* track, ClipId* clip) const;
 
+    /**
+     * Normalized 0..1 box of a layer at the playhead, as left/top/right/bottom,
+     * for drawing the preview's selection outline where the pixels actually
+     * sit. False when that layer draws nothing at the current time.
+     */
+    bool preview_clip_bounds(TrackId track, ClipId clip, float* out4) const;
+
     ProjectSession& project() { return *project_; }
     const ProjectSession& project() const { return *project_; }
 

@@ -44,6 +44,16 @@ public:
    */
   bool hit_test(TimeSec t, float nx, float ny, TrackId* track, ClipId* clip) const;
 
+  /**
+   * Normalized 0..1 box of one clip as the compositor draws it at time `t`,
+   * written left/top/right/bottom. This is the same box hit_test() tests, so a
+   * selection outline and a tap can never disagree. False when the clip is not
+   * on screen at `t` or draws no pixels of its own (null, adjustment layer,
+   * fully transparent).
+   */
+  bool clip_bounds(TimeSec t, TrackId track, ClipId clip, float* nx0, float* ny0, float* nx1,
+                   float* ny1) const;
+
   /** Current playhead helpers */
   Error scrub(TimeSec t, ImageBuffer& out) { return render_frame(t, out); }
 

@@ -388,6 +388,44 @@ bool TimelinePlayer::hit_test(TimeSec t, float nx, float ny, TrackId* out_track,
   return false;
 }
 
+bool TimelinePlayer::clip_bounds(TimeSec t, TrackId track_id, ClipId clip_id, float* nx0,
+                                 float* ny0, float* nx1, float* ny1) const {
+  if (nx0) *nx0 = 0.f;
+  if (ny0) *ny0 = 0.f;
+  if (nx1) *nx1 = 0.f;
+  if (ny1) *ny1 = 0.f;
+  if (!session_ || clip_id == 0) return false;
+  const int W = output_width();
+  const int H = output_height();
+  if (W <= 0 || H <= 0) return false;
+
+  const ClipInfo* clip = nullptr;
+  for (const auto& tr : session_->tracks()) {
+    if (tr.id != track_id) continue;
+    for (const auto& c : tr.clips) {
+      if (c.id == clip_id) clip = &c;
+    }
+  }
+  if (!clip) return false;
+  // Same exclusions as hit_test(): these layers own no picture to outline.
+  if (clip->is_null || clip->is_adjustment) return false;
+  if (t < clip->start || t >= clip->start + clip->duration) return false;
+
+  float op = 1.f, dx = 0.f, dy = 0.f, sc = 1.f;
+  clip_transform(*clip, t, &op, &dx, &dy, &sc);
+  if (op <= 0.01f) return false;
+
+  const float w = static_cast<float>(W) * sc;
+  const float h = static_cast<float>(H) * sc;
+  const float ox = (static_cast<float>(W) - w) * 0.5f + dx;
+  const float oy = (static_cast<float>(H) - h) * 0.5f + dy;
+  if (nx0) *nx0 = ox / static_cast<float>(W);
+  if (ny0) *ny0 = oy / static_cast<float>(H);
+  if (nx1) *nx1 = (ox + w) / static_cast<float>(W);
+  if (ny1) *ny1 = (oy + h) / static_cast<float>(H);
+  return true;
+}
+
 Error TimelinePlayer::render_frame(TimeSec t, ImageBuffer& out) {
   return render_frame_at(t, out, output_width(), output_height());
 }

@@ -6,11 +6,14 @@
 // draw nothing (nulls, adjustment layers) are never picked.
 #include "ms_engine.hpp"
 
+#include <cmath>
 #include <cstdio>
 
 using namespace ms;
 
 static int failures = 0;
+
+static bool near(float a, float b) { return std::fabs(a - b) < 1e-3f; }
 
 static void check(bool cond, const char* what) {
     if (!cond) {
@@ -56,6 +59,16 @@ int main() {
     check(!e.preview_hit_test(0.2f, 0.5f, &hit_track, &hit_clip),
           "the old position no longer hits");
 
+    // ---- The outline box is the box the pick uses --------------------------
+    // A selection outline has to sit exactly over the pixels a tap picks, so it
+    // reads the same transform rather than re-deriving one in the UI.
+    float box[4] = {0.f, 0.f, 0.f, 0.f};
+    check(e.preview_clip_bounds(base_track, base, box), "the layer reports an outline box");
+    check(near(box[0], 0.5f) && near(box[2], 1.0f),
+          "the box follows the keyed scale and the position offset");
+    check(near(box[1], 0.25f) && near(box[3], 0.75f), "the box keeps the layer's height");
+    check(!e.preview_clip_bounds(base_track, base + 999, box), "an unknown clip has no box");
+
     // ---- Topmost layer wins ------------------------------------------------
     const TrackId top_track = e.add_track("Overlay", 1 /* Overlay */);
     check(top_track != 0, "overlay track added");
@@ -75,6 +88,7 @@ int main() {
     check(null_id != 0, "null object added");
     check(e.preview_hit_test(0.5f, 0.5f, &hit_track, &hit_clip) && hit_clip == top,
           "a null object is never picked");
+    check(!e.preview_clip_bounds(top_track, null_id, box), "a null object has no outline");
     e.remove_clip(top_track, null_id);
 
     // ---- Guards ------------------------------------------------------------
@@ -85,6 +99,8 @@ int main() {
     e.seek(6.0);
     check(!e.preview_hit_test(0.5f, 0.5f, &hit_track, &hit_clip),
           "a playhead past every layer picks nothing");
+    check(!e.preview_clip_bounds(base_track, base, box),
+          "a playhead past the layer draws no outline");
     e.seek(1.0);
 
     if (failures == 0) {

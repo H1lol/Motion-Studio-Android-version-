@@ -228,6 +228,13 @@ int ms_preview_hit_test(float nx, float ny, int* track_id, int* clip_id) {
     if (clip_id) *clip_id = static_cast<int>(clip);
     return 0;
 }
+int ms_preview_clip_bounds(int track_id, int clip_id, float* out4) {
+    if (!out4) return -1;
+    return ms::Engine::instance().preview_clip_bounds(static_cast<ms::TrackId>(track_id),
+                                                      static_cast<ms::ClipId>(clip_id), out4)
+               ? 0
+               : -1;
+}
 int ms_project_load(const char* json) { return json && ms::Engine::instance().load_project_json(json) ? 0 : -1; }
 int ms_project_save(const char* path) { return path && ms::Engine::instance().save_project(path).ok() ? 0 : -1; }
 int ms_project_autosave(const char* path) { return path && ms::Engine::instance().autosave_project(path).ok() ? 0 : -1; }

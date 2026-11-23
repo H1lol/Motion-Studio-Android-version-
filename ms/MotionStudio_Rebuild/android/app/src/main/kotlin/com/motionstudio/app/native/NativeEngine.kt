@@ -88,6 +88,13 @@ object NativeEngine {
      * playhead, into `[trackId, clipId]`. False when the tap missed every layer.
      */
     external fun nativePreviewHitTest(nx: Float, ny: Float, out: IntArray): Boolean
+    /**
+     * On-screen box of one layer at the playhead, into `[l, t, r, b]` as
+     * normalized 0..1 coordinates of the composite; false when it draws nothing
+     * right now. This is the box the hit test uses, so an outline sits exactly
+     * over the pixels a tap would pick.
+     */
+    external fun nativePreviewClipBounds(trackId: Int, clipId: Int, out: FloatArray): Boolean
 
     // Proxy media: preview decodes the registered stand-in, export turns proxies
     // off first so the delivered master always comes from the source file.

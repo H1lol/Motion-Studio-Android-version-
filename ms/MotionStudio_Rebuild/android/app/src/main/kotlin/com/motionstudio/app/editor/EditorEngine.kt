@@ -500,6 +500,20 @@ class EditorEngine(
         return true
     }
 
+    /**
+     * Where the selected layer sits in the composite, written into [out] as
+     * left/top/right/bottom normalized 0..1 — the box the preview outlines.
+     *
+     * The engine resolves the transform at the playhead, so a keyframed or
+     * parented layer is outlined where its pixels are this frame, and a layer
+     * that draws nothing (off the playhead, transparent, null, adjustment) has
+     * no outline at all.
+     */
+    fun selectionBounds(out: FloatArray): Boolean {
+        if (selectedClipId <= 0) return false
+        return NativeEngine.nativePreviewClipBounds(selectedTrackId, selectedClipId, out)
+    }
+
     fun splitAtPlayhead(): Boolean {
         val trackId = selectedTrackId
         val clipId = selectedClipId

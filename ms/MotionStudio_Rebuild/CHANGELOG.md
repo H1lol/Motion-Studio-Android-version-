@@ -9,6 +9,13 @@
   layer composited there. The pick uses the renderer's own transform, so a scaled, moved or
   parented layer is picked where its pixels are, not where the frame is. The topmost track
   wins where layers overlap, and a tap on empty picture clears the selection
+- **The selected layer is outlined in the preview.** A thin accent rectangle is drawn over
+  the layer's on-screen box, so a pick made in the viewport is visible where it sits. The
+  box is resolved by the engine at the playhead with the same `clip_transform` used to
+  composite and to hit-test, and only mapped through the frame as drawn, so canvas zoom,
+  letterboxing, preview quality, keyframed motion and parenting all apply. Outline only: no
+  handles and no new gestures, and a layer that draws nothing (off the playhead,
+  transparent, null, adjustment) has no outline
 - **Two-finger double-tap recentres the canvas**, in PAN / ZOOM mode only. Two fingers that
   lift within 280 ms without moving count as a tap; a second one within 350 ms resets the
   pan and zoom. With the toggle off the same fingers mean a layer transform, so they never
@@ -18,7 +25,10 @@
   `ms_preview_hit_test` and mirrored in JNI as `nativePreviewHitTest`, with
   `EditorEngine.pickAt` owning the selection change. The compositor and the hit test share
   one `clip_transform`, so the two cannot drift apart. Null objects and adjustment layers
-  draw no pixels of their own and are never picked
+  draw no pixels of their own and are never picked. `TimelinePlayer::clip_bounds` reports
+  the same box as normalized left/top/right/bottom for the selection outline, exposed as
+  `Engine::preview_clip_bounds`, `ms_preview_clip_bounds`, `nativePreviewClipBounds` and
+  `EditorEngine.selectionBounds`
 
 ### Verified
 - `ms_hit_test` (new, in `ctest`): a full-frame layer is picked at the centre and the
@@ -28,10 +38,14 @@
   playhead past every layer pick nothing. Native suite: **29/30**, with
   `ms_audio_playback_test` still the only failure because this container has no `ffmpeg`
   CLI for its fixtures
+- The outline is covered by the same `ms_hit_test`: a keyed scale and position offset move
+  the reported box to the pixels the pick uses, an unknown clip and a null object report
+  no box, and a playhead past the layer reports none either
 - `:app:assembleDebug` succeeds, and `libmotionstudio_jni.so` carries
-  `nativePreviewHitTest` for arm64-v8a and x86_64
+  `nativePreviewHitTest` and `nativePreviewClipBounds` for arm64-v8a and x86_64
 - Not verified: no device or emulator here, so tap picking against a real finger, the tap
-  slop, and the double-tap timing were not exercised by hand
+  slop, the double-tap timing and the look of the outline on a screen were not exercised by
+  hand
 
 ### Provenance
 Behaviour described here comes from Alight Creative's public documentation of preview pan

@@ -71,6 +71,9 @@ int ms_preview_frame_size(int* width, int* height);
 // Viewport picking: normalized (0..1) point across the composited frame at the
 // current playhead. Fills the topmost layer's track and clip; false on a miss.
 int ms_preview_hit_test(float nx, float ny, int* track_id, int* clip_id);
+// Normalized 0..1 on-screen box of one layer at the playhead, filled as
+// left/top/right/bottom; -1 when it draws nothing at that time.
+int ms_preview_clip_bounds(int track_id, int clip_id, float* out4);
 
 // Timeline audio. The host audio thread pulls interleaved f32 PCM for the
 // current playhead; the master insert chain is already applied.

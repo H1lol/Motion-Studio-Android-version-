@@ -54,6 +54,10 @@ class PreviewView(context: Context) : View(context) {
     private var lastSignature = Long.MIN_VALUE
     private var lastPlaying = false
 
+    /** Last selection seen by the worker, so the outline repaints when it moves. */
+    private var lastSelectionTrack = Int.MIN_VALUE
+    private var lastSelectionClip = Int.MIN_VALUE
+
     @Volatile
     private var looping = false
 
@@ -75,6 +79,16 @@ class PreviewView(context: Context) : View(context) {
         textSize = 24f
         letterSpacing = 0.08f
     }
+    // Selection outline: a thin accent rectangle over the layer the engine says
+    // is selected, so a pick made in the viewport is visible where it sits.
+    // Outline only — no handles, and it adds no gesture of its own.
+    private val selectionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#FFA98BFF")
+        style = Paint.Style.STROKE
+        strokeWidth = 1.5f * resources.displayMetrics.density
+    }
+    private val selectionBounds = FloatArray(4)
+
     private val src = Rect()
     private val dst = RectF()
 
@@ -208,12 +222,22 @@ class PreviewView(context: Context) : View(context) {
         val editor = engine ?: return false
         if (!visible) return false
 
+        // A selection change moves the outline but leaves the pixels alone, so
+        // it has to invalidate even though the signature has not moved.
+        val selTrack = editor.selectedTrackId
+        val selClip = editor.selectedClipId
+        val selectionChanged = selTrack != lastSelectionTrack || selClip != lastSelectionClip
+        if (selectionChanged) {
+            lastSelectionTrack = selTrack
+            lastSelectionClip = selClip
+        }
+
         // Nothing that affects the picture has moved: do not composite, do not
         // copy pixels and do not invalidate the view. This is the whole reason a
         // paused editor stays cool; the previous version re-rendered on a timer
         // whether or not anything had changed.
         val signature = NativeEngine.nativeRenderSignature()
-        if (signature == lastSignature && !lastPlaying) return false
+        if (signature == lastSignature && !lastPlaying) return selectionChanged
 
         val state = NativeEngine.nativePreviewState()
         if (state.size < 4) return false
@@ -260,7 +284,7 @@ class PreviewView(context: Context) : View(context) {
             lastRatio = ratio
             post { resetView() }
         }
-        return ready
+        return ready || selectionChanged
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -321,6 +345,8 @@ class PreviewView(context: Context) : View(context) {
             drawnFrameTop = dst.top
         }
 
+        drawSelection(canvas)
+
         // While a layer gesture is in flight the picture only updates on release,
         // so the readout is the feedback: without it the two fingers feel dead.
         if (gestureActive && !navigating()) {
@@ -336,6 +362,25 @@ class PreviewView(context: Context) : View(context) {
             canvas.drawRoundRect(cx - half, cy - 22f, cx + half, cy + 10f, 6f, 6f, hudBgPaint)
             canvas.drawText(label, cx, cy, hudPaint)
         }
+    }
+
+    /**
+     * Outlines the selected layer where it sits in the picture.
+     *
+     * The box comes from the engine at the playhead, resolved with the same
+     * transform that composites the layer, and is only mapped through the frame
+     * as last drawn — so canvas zoom, letterboxing and preview quality all
+     * apply, and a keyframed or parented layer is outlined on its own pixels.
+     */
+    private fun drawSelection(canvas: Canvas) {
+        val editor = engine ?: return
+        if (drawnFrameW <= 0f || drawnFrameH <= 0f) return
+        if (!editor.selectionBounds(selectionBounds)) return
+        val left = drawnFrameLeft + selectionBounds[0] * drawnFrameW
+        val top = drawnFrameTop + selectionBounds[1] * drawnFrameH
+        val right = drawnFrameLeft + selectionBounds[2] * drawnFrameW
+        val bottom = drawnFrameTop + selectionBounds[3] * drawnFrameH
+        canvas.drawRect(left, top, right, bottom, selectionPaint)
     }
 
     /** The visible PAN / ZOOM toggle: two-finger gestures always move the canvas. */

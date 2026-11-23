@@ -298,6 +298,18 @@ bool Engine::preview_hit_test(float nx, float ny, TrackId* track, ClipId* clip) 
     return player_->hit_test(impl_->current_time.load(), nx, ny, track, clip);
 }
 
+bool Engine::preview_clip_bounds(TrackId track, ClipId clip, float* out4) const {
+    if (out4) {
+        out4[0] = 0.f;
+        out4[1] = 0.f;
+        out4[2] = 0.f;
+        out4[3] = 0.f;
+    }
+    if (!player_ || !project_ || !out4) return false;
+    return player_->clip_bounds(impl_->current_time.load(), track, clip, out4, out4 + 1, out4 + 2,
+                                out4 + 3);
+}
+
 bool Engine::load_look(const std::string& path) {
     auto lut = std::make_unique<Lut3D>();
     if (!load_cube_lut(path, *lut)) return false;
