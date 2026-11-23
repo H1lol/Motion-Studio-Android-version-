@@ -73,6 +73,9 @@ endforeach()
 
 add_library(ms_core STATIC ${MS_CORE_SOURCES})
 set_target_properties(ms_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
+# Every function gets its own section so the final link can drop the ones the
+# app never reaches (the desktop tools and tests are not shipped).
+target_compile_options(ms_core PUBLIC -ffunction-sections -fdata-sections)
 target_include_directories(ms_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 # Android platform media APIs (AMediaCodec / AMediaExtractor) back the decoder
 # on device; the desktop build has no equivalent and uses ffmpeg instead.
@@ -85,9 +88,22 @@ endif()
 # C ABI used by Flutter FFI.
 add_library(motionstudio_native SHARED bridge/ms_bridge.cpp)
 target_link_libraries(motionstudio_native PRIVATE ms_core)
+# Drop unreferenced sections and keep static-library symbols out of the dynamic
+# symbol table, which is what the APK actually stores.
+target_link_options(motionstudio_native PRIVATE -Wl,--gc-sections)
+if(ANDROID)
+  # The APK is the only consumer that wants a small symbol table; the desktop
+  # test binaries link against the shared library and need Engine exported.
+  target_link_options(motionstudio_native PRIVATE -Wl,--exclude-libs,ALL)
+endif()
 target_include_directories(motionstudio_native PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 set_target_properties(motionstudio_native PROPERTIES OUTPUT_NAME "motionstudio_native")
 
+
+# Desktop-only harnesses and tests: the APK needs the engine and the JNI bridge,
+# not a dozen test binaries, so MS_BUILD_TESTS=OFF (the Android build) skips
+# compiling and linking them entirely.
+if(MS_BUILD_TESTS)
 
 add_executable(ms_studio_test tools/ms_studio_test.cpp)
 target_link_libraries(ms_studio_test PRIVATE ms_core)
@@ -252,3 +268,5 @@ set_tests_properties(
   ms_engine_audio_test ms_lut_test ms_edit_test
   PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../.."
 )
+
+endif()

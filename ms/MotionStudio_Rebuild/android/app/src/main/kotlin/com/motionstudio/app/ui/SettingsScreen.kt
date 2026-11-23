@@ -228,7 +228,7 @@ fun SettingsScreen(settings: SettingsStore, onBack: () -> Unit) {
 
         Spacer(Modifier.height(24.dp))
         Text(
-            "Motion Studio 2026.1.0 · GPL-3.0-or-later",
+            "Motion Studio 2026.1.0",
             color = MsColors.textMuted,
             fontSize = 11.sp,
             modifier = Modifier.padding(horizontal = 16.dp),

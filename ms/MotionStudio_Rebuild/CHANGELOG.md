@@ -1,5 +1,42 @@
 # Changelog
 
+## Unreleased — slimmer install
+
+### Changed
+- **The installable build is now a release build, and it is 6.5 MB** (was a 65 MB
+  debug APK). `assembleRelease` enables R8 and resource shrinking, so the Compose and
+  `material-icons-extended` classes the app never references are no longer in the APK:
+  `classes.dex` drops from 44.7 MB to 2.3 MB. It is signed with the debug key so it can
+  still be sideloaded for testing, and the same key keeps the package id and upgrade path
+- **One ABI per APK.** The phone build carries `arm64-v8a` only instead of arm64 plus
+  x86_64; `-Pemulator` adds x86_64 back for an emulator build. The APK reports
+  `native-code: 'arm64-v8a'`
+- **The native libraries lose their dead code.** `ms_core` is compiled with
+  `-ffunction-sections -fdata-sections` and linked with `--gc-sections`, and on Android the
+  shared libraries also use `--exclude-libs,ALL` so engine-internal symbols stay out of the
+  exported symbol table: `libmotionstudio_native.so` goes from 1.9 MB to 0.6 MB stripped
+- **The Android build no longer compiles the desktop test binaries.** The 30 test and
+  harness executables are gated behind `MS_BUILD_TESTS`, which the Android CMake project
+  forces off, so an app build links the engine and the JNI bridge and nothing else
+- **Preview quality defaults to Half** (new installs and anyone who has never chosen). A
+  1080p project now composites at half size while editing, which is a quarter of the frame
+  pixels and roughly a quarter of the frame-bitmap memory; **Full** is still one tap away
+  in Settings → Preview, and export is unaffected and always renders the project canvas
+- **The About footer no longer prints the license tag.** `LICENSE` and `THIRD_PARTY.md`
+  still carry the full GPL-3.0 text, which is what the license requires when binaries are
+  distributed; only the repeated in-app label was dropped
+
+### Verified
+- `:app:assembleRelease` succeeds: 6,535,559 bytes, `lib/arm64-v8a` only, one `classes.dex`,
+  signed (apksigner: `CN=Android Debug`), `minSdk 29`, `native-code: 'arm64-v8a'`
+- R8 keeps the JNI surface: `NativeEngine` maps to its own name, the released dex still
+  contains the `nativePreview*` method names, and `libmotionstudio_jni.so` exports all 165
+  `Java_com_motionstudio_*` entry points
+- Native suite after the CMake changes: **29/30**, `ms_audio_playback_test` still the only
+  failure (no `ffmpeg` CLI here for its fixtures)
+- Not verified: no device here. The release APK has not been installed, launched, or
+  measured for start-up time and memory on a phone
+
 ## Unreleased — viewport tap-to-select and double-tap recentre
 
 ### Added

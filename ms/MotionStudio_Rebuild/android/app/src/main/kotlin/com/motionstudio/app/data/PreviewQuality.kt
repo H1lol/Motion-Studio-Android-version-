@@ -29,14 +29,14 @@ object PreviewQualityStore {
 
     private var prefs: android.content.SharedPreferences? = null
 
-    var quality by mutableStateOf(PreviewQuality.Full)
+    var quality by mutableStateOf(PreviewQuality.Half)
         private set
 
     /** Reads the saved value and applies it. Safe before the engine is initialised. */
     fun init(context: Context) {
         val store = context.getSharedPreferences("motion_studio_settings", Context.MODE_PRIVATE)
         prefs = store
-        quality = PreviewQuality.entries.getOrNull(store.getInt(KEY, 0)) ?: PreviewQuality.Full
+        quality = PreviewQuality.entries.getOrNull(store.getInt(KEY, PreviewQuality.Half.ordinal)) ?: PreviewQuality.Half
         apply()
     }
 

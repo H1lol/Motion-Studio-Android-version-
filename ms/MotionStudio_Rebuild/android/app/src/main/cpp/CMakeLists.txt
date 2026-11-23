@@ -27,6 +27,12 @@ target_link_libraries(motionstudio_jni
   jnigraphics
   log)
 
+# The APK only ever needs what the app calls: place each function in its own
+# section and let the linker discard the rest, and keep engine-internal symbols
+# out of the exported symbol table.
+target_compile_options(motionstudio_jni PRIVATE -ffunction-sections -fdata-sections)
+target_link_options(motionstudio_jni PRIVATE -Wl,--gc-sections -Wl,--exclude-libs,ALL)
+
 # The engine core links the shared runtime, so ship it with the APK.
 set_target_properties(motionstudio_jni PROPERTIES
   BUILD_RPATH "$ORIGIN"

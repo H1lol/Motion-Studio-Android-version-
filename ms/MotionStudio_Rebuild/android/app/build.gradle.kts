@@ -23,8 +23,13 @@ android {
             }
         }
         ndk {
-            // Phones ship arm64; x86_64 keeps emulator builds working.
-            abiFilters += listOf("arm64-v8a", "x86_64")
+            // Phones ship arm64 only: one ABI in the APK instead of two. Build
+            // the emulator variant with -Pemulator to add x86_64 back.
+            abiFilters += if (project.hasProperty("emulator")) {
+                listOf("arm64-v8a", "x86_64")
+            } else {
+                listOf("arm64-v8a")
+            }
         }
     }
 
@@ -53,15 +58,34 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // The installable build. R8 removes the Compose and material-icons
+            // classes the app never references (the extended icon set alone is
+            // tens of MB of dex), and shrinkResources drops unused fonts and
+            // drawables. Signed with the debug key so it can be sideloaded.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            signingConfig = signingConfigs.getByName("debug")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
 
     packaging {
         jniLibs {
+            // Uncompressed .so files are mapped straight from the APK, so the
+            // installer copies nothing and the loader mmaps one file.
             useLegacyPackaging = false
         }
+        resources {
+            // Nothing reads the merged dependency metadata at runtime.
+            excludes += listOf("META-INF/*.version", "META-INF/com/android/build/gradle/**")
+        }
+    }
+
+    dependenciesInfo {
+        // Both blobs only describe the build to Play; they cost space in a
+        // sideloaded APK.
+        includeInApk = false
+        includeInBundle = false
     }
 }
 
