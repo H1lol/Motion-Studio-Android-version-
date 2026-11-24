@@ -28,8 +28,10 @@
   than read out of bounds. JNI entry points that touch media (`importMedia`, `addClip`,
   `renderFrame`) also catch C++ exceptions instead of letting one abort the process
 - **A new project no longer opens with three empty lanes.** `Video 1` is the only default
-  track; Overlay and Audio are no longer created until something needs them. Titles go on
-  the picture track
+  track; Overlay and Audio are no longer created until something needs them
+- **Text gets its own lane, but only when you use it.** The Text tool adds the title to an
+  overlay track and creates that track the first time a title is added, so titles never
+  replace or trim the shot on `Video 1` and projects that never use text stay single-track
 
 ### Changed
 - **The editor layout gives the picture the space.** One 48 dp header (name, clock,
@@ -46,7 +48,12 @@
 - `:app:assembleRelease` succeeds in 3m 34s: **7,941,362 bytes** (6,535,559 before the
   32-bit slice), `native-code: 'arm64-v8a' 'armeabi-v7a'`, `minSdk 29`, signed
   `CN=Android Debug`
-- JVM unit tests: `ScriptExpressionTest` 7/7, `DeviceProfileTest` 4/4
+- JVM unit tests: `ScriptExpressionTest` 7/7, `DeviceProfileTest` 4/4,
+  `MediaImportRulesTest` 4/4 (the fallback duration survives a zero-length probe)
+- Native `ms_clip_length_test` 10/10: a new project is 15 s, a clip inside that keeps the
+  floor, a clip at 20 s + 4 s grows both `sequence_end()` and the saved document, and the
+  growth survives a JSON reload. Full `ctest`: 30/31, only `ms_audio_playback_test` fails
+  (no `ffmpeg` CLI here to generate its fixture)
 - Native suite: 29/30; `ms_audio_playback_test` still the only failure (no `ffmpeg` CLI here
   for its fixtures). `ms_11_16_test` now asserts that the saved document keeps both the
   default lane and the one it adds, instead of assuming three defaults

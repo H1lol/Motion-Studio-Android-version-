@@ -32,7 +32,21 @@ data class CompLink(val node: Int, val param: String, val src: Int, val srcParam
 /** One insert on the master audio chain. kind mirrors ms::AudioFxKind. */
 data class AudioInsert(val index: Int, val kind: Int, val enabled: Boolean)
 
+/** ms::TrackType::Overlay, the lane titles are composited on. */
+internal const val OVERLAY_TRACK_TYPE = 1
+
 val AUDIO_INSERT_NAMES = listOf("Gain", "Parametric EQ", "Compressor", "Delay", "Reverb", "Limiter")
+
+/**
+ * Length an imported clip gets on the timeline.
+ *
+ * The native probe reports 0 for containers whose track format omits DURATION,
+ * which used to cut every import to the 5 s fallback. The platform duration
+ * (MediaMetadataRetriever) wins whenever it is the larger number; 5 s is only
+ * the last resort when both sources are unusable.
+ */
+internal fun importClipLength(probedDuration: Double, fallbackDuration: Double): Double =
+    maxOf(probedDuration, fallbackDuration).takeIf { it > 0.05 } ?: 5.0
 
 /** One numeric knob a node exposes, with the range the UI should offer. */
 data class Knob(
@@ -573,7 +587,7 @@ class EditorEngine(
         }
         reload()
         val media = doc.media.firstOrNull { it.id == mediaId }
-        val length = maxOf(media?.duration ?: 0.0, fallbackDuration).takeIf { it > 0.05 } ?: 5.0
+        val length = importClipLength(media?.duration ?: 0.0, fallbackDuration)
         val trackId = selectedTrackId.takeIf { it > 0 } ?: doc.tracks.firstOrNull()?.id ?: -1
         val at = if (appendToEnd) doc.timelineEnd else time
         if (trackId > 0) {
@@ -1426,18 +1440,33 @@ class EditorEngine(
         return doc.clipById(t, c)?.text.orEmpty()
     }
 
-    /** Adds a title clip at the playhead on the overlay (or first video) track. */
+    /**
+     * Adds a title clip at the playhead on an overlay lane.
+     *
+     * Titles never go on the picture track: they would replace or trim the shot
+     * underneath. The first title creates its own overlay lane, so a project that
+     * never uses text stays a single-track project.
+     */
     fun addTitle(text: String, opts: TitleOptions, duration: Double = 3.0): Boolean {
         if (text.isBlank()) {
             status = "Type the title text first"
             return false
         }
-        val track = doc.tracks.firstOrNull { it.type == 1 }
-            ?: doc.tracks.firstOrNull { it.type == 0 }
-            ?: run {
-                status = "No video or overlay track to put the title on"
+        var track = doc.tracks.firstOrNull { it.type == OVERLAY_TRACK_TYPE }
+        if (track == null) {
+            val name = "Overlay ${doc.tracks.count { it.type == OVERLAY_TRACK_TYPE } + 1}"
+            val newId = NativeEngine.nativeTrackAdd(name, OVERLAY_TRACK_TYPE)
+            if (newId <= 0) {
+                status = "Could not create an overlay lane for the title"
                 return false
             }
+            reload()
+            track = doc.tracks.firstOrNull { it.id == newId }
+        }
+        if (track == null) {
+            status = "No overlay lane to put the title on"
+            return false
+        }
         val id = NativeEngine.nativeTextAddClip(
             track.id, time, duration, text, opts.font, opts.size, opts.color,
             opts.align, opts.anchor, opts.outline, opts.outlineColor, opts.shadow,
