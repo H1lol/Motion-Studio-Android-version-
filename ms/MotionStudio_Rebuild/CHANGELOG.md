@@ -18,10 +18,18 @@
 - **The Android build no longer compiles the desktop test binaries.** The 30 test and
   harness executables are gated behind `MS_BUILD_TESTS`, which the Android CMake project
   forces off, so an app build links the engine and the JNI bridge and nothing else
-- **Preview quality defaults to Half** (new installs and anyone who has never chosen). A
-  1080p project now composites at half size while editing, which is a quarter of the frame
-  pixels and roughly a quarter of the frame-bitmap memory; **Full** is still one tap away
-  in Settings → Preview, and export is unaffected and always renders the project canvas
+- **Preview quality defaults to Half on a phone that can afford it**, and to Quarter on one
+  that cannot (see below). A 1080p project now composites at half size while editing, which
+  is a quarter of the frame pixels and roughly a quarter of the frame-bitmap memory; **Full**
+  is still one tap away in Settings → Preview, and export is unaffected and always renders
+  the project canvas
+- **The first-run preview follows the device.** `DeviceProfile` reads `isLowRamDevice`, the
+  heap class (`ActivityManager.memoryClass`) and the core count once at process start and
+  picks the starting preview: `Quarter` on a low-RAM build, a heap class of 192 MB or less,
+  or two cores; `Half` otherwise. On a 1080p project that is about 2 MB per frame buffer
+  instead of 8 MB, and a sixteenth of the pixels to composite per frame. The pick is written
+  to the saved setting on that first run, so a later choice in Settings always wins. The
+  Settings → Preview section now names the device class and the size it suggests
 - **The About footer no longer prints the license tag.** `LICENSE` and `THIRD_PARTY.md`
   still carry the full GPL-3.0 text, which is what the license requires when binaries are
   distributed; only the repeated in-app label was dropped

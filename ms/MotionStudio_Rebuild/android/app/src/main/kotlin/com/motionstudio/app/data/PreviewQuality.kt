@@ -32,11 +32,23 @@ object PreviewQualityStore {
     var quality by mutableStateOf(PreviewQuality.Half)
         private set
 
-    /** Reads the saved value and applies it. Safe before the engine is initialised. */
+    /**
+     * Reads the saved value and applies it. Safe before the engine is initialised.
+     *
+     * With nothing saved — a new install, or a device that has never run this
+     * version — the first value comes from [DeviceProfile], so a budget phone
+     * opens at a size it can composite instead of at half the canvas. The pick
+     * is written down immediately, so a later default never overrides a choice
+     * the user has made.
+     */
     fun init(context: Context) {
         val store = context.getSharedPreferences("motion_studio_settings", Context.MODE_PRIVATE)
         prefs = store
-        quality = PreviewQuality.entries.getOrNull(store.getInt(KEY, PreviewQuality.Half.ordinal)) ?: PreviewQuality.Half
+        quality = if (store.contains(KEY)) {
+            PreviewQuality.entries.getOrNull(store.getInt(KEY, -1)) ?: DeviceProfile.suggestedQuality
+        } else {
+            DeviceProfile.suggestedQuality.also { store.edit().putInt(KEY, it.ordinal).apply() }
+        }
         apply()
     }
 

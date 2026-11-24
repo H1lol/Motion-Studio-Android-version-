@@ -40,6 +40,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.motionstudio.app.data.DeviceProfile
 import com.motionstudio.app.data.PreviewQuality
 import com.motionstudio.app.data.PreviewQualityStore
 import com.motionstudio.app.data.SettingsStore
@@ -145,6 +146,13 @@ fun SettingsScreen(settings: SettingsStore, onBack: () -> Unit) {
                         "always renders the project canvas in full.",
                     color = MsColors.textTertiary,
                     fontSize = 11.sp,
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    "This phone: ${DeviceProfile.describe()}. New installs start at " +
+                        "${DeviceProfile.suggestedQuality.label} here.",
+                    color = MsColors.textMuted,
+                    fontSize = 10.sp,
                 )
             }
         }
