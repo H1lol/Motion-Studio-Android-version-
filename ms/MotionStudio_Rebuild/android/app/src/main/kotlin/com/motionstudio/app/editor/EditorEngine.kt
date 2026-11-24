@@ -552,11 +552,19 @@ class EditorEngine(
         return ok
     }
 
-    /** Imports media and drops it on the first track at the playhead. */
+    /**
+     * Imports media and drops it on the first track at the playhead.
+     *
+     * [fallbackDuration] is what the platform reported (MediaMetadataRetriever).
+     * The native decoder used to report no duration at all for many containers,
+     * which cut every imported clip to five seconds; this keeps the real length
+     * even when the native probe comes back empty.
+     */
     fun importMedia(
         path: String,
         displayName: String? = null,
         appendToEnd: Boolean = false,
+        fallbackDuration: Double = 0.0,
     ): Boolean {
         val mediaId = NativeEngine.nativeImportMedia(path)
         if (mediaId <= 0) {
@@ -565,7 +573,7 @@ class EditorEngine(
         }
         reload()
         val media = doc.media.firstOrNull { it.id == mediaId }
-        val length = media?.duration?.takeIf { it > 0.05 } ?: 5.0
+        val length = maxOf(media?.duration ?: 0.0, fallbackDuration).takeIf { it > 0.05 } ?: 5.0
         val trackId = selectedTrackId.takeIf { it > 0 } ?: doc.tracks.firstOrNull()?.id ?: -1
         val at = if (appendToEnd) doc.timelineEnd else time
         if (trackId > 0) {
@@ -767,6 +775,63 @@ class EditorEngine(
         reload()
         status = "Animation cleared"
         return true
+    }
+
+    /**
+     * Bakes an expression into keyframes on one motion channel of the selected
+     * clip — the After Effects "expressions" idea reduced to what this renderer
+     * can honour: the value is sampled once per frame and stored as keys, so the
+     * preview, export and save all see the same curve without a script runtime
+     * in the native path.
+     *
+     * prop: 0 opacity, 1 scale, 2 pos_x, 3 pos_y.
+     */
+    fun bakeExpression(prop: Int, expression: String): Int {
+        if (expression.isBlank()) {
+            status = "Write an expression first"
+            return -1
+        }
+        val (trackId, clipId) = selection() ?: run {
+            status = "Select a clip first"
+            return -1
+        }
+        val clip = doc.clipById(trackId, clipId) ?: return -1
+        val range = when (prop) {
+            0 -> 0.0..1.0
+            1 -> 0.05..10.0
+            else -> -2.0..2.0
+        }
+        val length = clip.duration.coerceAtLeast(0.1)
+        val step = (1.0 / fps).coerceAtLeast(length / MAX_BAKED_KEYS)
+        val samples = ArrayList<Pair<Double, Double>>()
+        var local = 0.0
+        try {
+            while (local <= length + 1e-6) {
+                val value = ScriptExpression.evaluate(expression, local, fps)
+                if (!value.isFinite()) {
+                    status = "The expression gave no number at " + "%.2f".format(local) + " s"
+                    return -1
+                }
+                samples += local to value.coerceIn(range.start, range.endInclusive)
+                local += step
+            }
+        } catch (e: ScriptExpression.Error) {
+            status = "Expression: ${e.message}"
+            return -1
+        }
+        if (samples.size < 2) {
+            status = "That clip is too short to bake"
+            return -1
+        }
+        NativeEngine.nativeKeyframeClear(trackId, clipId, prop)
+        var written = 0
+        for ((at, value) in samples) {
+            if (NativeEngine.nativeKeyframeAdd(trackId, clipId, prop, at, value)) written++
+        }
+        markDirty()
+        reload()
+        status = "Baked $written keys from the expression"
+        return written
     }
 
     /** The clip that follows the selected one on the same track, if any. */
@@ -1991,6 +2056,8 @@ class EditorEngine(
     companion object {
         const val AUTOSAVE_INTERVAL_MS = 10 * 60 * 1000L
         const val MIN_CLIP_SECONDS = 0.05
+        /** Upper bound on baked keys: a long clip samples coarser, not forever. */
+        const val MAX_BAKED_KEYS = 600
 
         fun formatTimecode(seconds: Double, fps: Double = 30.0): String {
             val safe = seconds.coerceAtLeast(0.0)

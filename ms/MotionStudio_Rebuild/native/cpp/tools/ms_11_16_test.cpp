@@ -14,7 +14,9 @@ int main(){
   const fs::path root="/tmp/ms_11_16"; fs::remove_all(root); fs::create_directories(root);
   ProjectSession p; CHECK(p.new_project("Test",640,360,30).ok(),"project create");
   auto tr=p.add_track("Extra",(int)TrackType::Video); ClipInfo c; c.name="C"; c.start=2;c.duration=3;c.gain=.7f;c.pan=.2f; auto clip=p.add_clip(tr,c); CHECK(clip!=0,"clip add");
-  auto json=p.to_json(); ProjectSession q; CHECK(q.load_from_json(json).ok(),"project load"); CHECK(q.tracks().size()>=4,"tracks preserved"); CHECK(q.find_track(tr)!=nullptr && q.find_track(tr)->clips.size()==1,"clip track preserved");
+  auto json=p.to_json(); ProjectSession q; CHECK(q.load_from_json(json).ok(),"project load"); // A project now starts with one picture track, so the saved document has
+  // that lane plus the one added here: both must survive the round trip.
+  CHECK(q.tracks().size()>=2,"tracks preserved"); CHECK(q.find_track(tr)!=nullptr && q.find_track(tr)->clips.size()==1,"clip track preserved");
   CHECK(q.move_clip(tr,clip,4),"edit"); CHECK(q.undo(),"undo"); CHECK(q.find_clip(tr,clip)->start==2,"undo state"); CHECK(q.redo(),"redo"); CHECK(q.find_clip(tr,clip)->start==4,"redo state");
   const auto save=(root/"project.msproj").string(); CHECK(q.save_to_file(save).ok(),"atomic save"); CHECK(fs::exists(save),"save exists"); ProjectSession r; CHECK(r.load_from_file(save).ok(),"file load"); CHECK(r.find_clip(tr,clip)!=nullptr,"file clip preserved");
   AutosaveController a(&r); a.set_path((root/"autosave.msproj").string()); a.set_interval(1); r.mark_dirty(); CHECK(a.force().ok(),"autosave"); CHECK(fs::exists(root/"autosave.msproj"),"autosave exists");

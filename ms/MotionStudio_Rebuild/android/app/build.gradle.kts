@@ -23,12 +23,14 @@ android {
             }
         }
         ndk {
-            // Phones ship arm64 only: one ABI in the APK instead of two. Build
-            // the emulator variant with -Pemulator to add x86_64 back.
+            // Arm64 plus the 32-bit ARM slice, so a budget phone that only runs
+            // 32-bit binaries can install the same APK. The extra slice costs
+            // about 0.6 MB of native code. Build the emulator variant with
+            // -Pemulator to swap the 32-bit slice for x86_64.
             abiFilters += if (project.hasProperty("emulator")) {
                 listOf("arm64-v8a", "x86_64")
             } else {
-                listOf("arm64-v8a")
+                listOf("arm64-v8a", "armeabi-v7a")
             }
         }
     }

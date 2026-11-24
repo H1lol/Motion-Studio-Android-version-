@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <cstdlib>
 #include <cstring>
 #include <vector>
@@ -96,6 +97,27 @@ public:
     AMediaFormat_getInt32(chosen, AMEDIAFORMAT_KEY_HEIGHT, &h);
     int64_t duration_us = 0;
     AMediaFormat_getInt64(chosen, AMEDIAFORMAT_KEY_DURATION, &duration_us);
+    // A decoder's track format usually omits DURATION (it is a property of the
+    // extractor's file format, not of the coded track). Without this fallback
+    // info().duration_ms stayed 0, every imported clip was cut to a guessed
+    // five seconds, and the sequence appeared to end at the project's default
+    // length. Ask the container, then the last sample, before giving up.
+    if (duration_us <= 0) {
+      if (AMediaFormat* file_fmt = AMediaExtractor_getFileFormat(extractor_)) {
+        int64_t file_us = 0;
+        if (AMediaFormat_getInt64(file_fmt, AMEDIAFORMAT_KEY_DURATION, &file_us) && file_us > 0) {
+          duration_us = file_us;
+        }
+        AMediaFormat_delete(file_fmt);
+      }
+    }
+    if (duration_us <= 0) {
+      AMediaExtractor_seekTo(extractor_, std::numeric_limits<int64_t>::max(),
+                             AMEDIAEXTRACTOR_SEEK_CLOSEST_SYNC);
+      const int64_t last_us = AMediaExtractor_getSampleTime(extractor_);
+      if (last_us > 0) duration_us = last_us + 40000;
+      AMediaExtractor_seekTo(extractor_, 0, AMEDIAEXTRACTOR_SEEK_PREVIOUS_SYNC);
+    }
     float frame_rate = 0.f;
     AMediaFormat_getFloat(chosen, AMEDIAFORMAT_KEY_FRAME_RATE, &frame_rate);
 
@@ -357,29 +379,45 @@ private:
     if (!out.allocate(w, h, PixelFormat::RGBA8))
       return Error::make(ErrorCode::OutOfMemory, "frame buffer");
 
-    const int stride = stride_ > 0 ? stride_ : w;
-    const int slice = slice_h_ > 0 ? slice_h_ : h;
     const bool planar = color_format_ == kColorFormatYUV420Planar ||
                         color_format_ == kColorFormatYV12;
     const bool swapped_uv = color_format_ == kColorFormatYV12;
 
-    const size_t y_size = static_cast<size_t>(stride) * slice;
-    const size_t chroma_stride = planar ? (stride / 2) : stride;
-    const size_t chroma_size = chroma_stride * (slice / 2);
-    if (size < y_size + 2 * chroma_size) {
-      // Some devices report a tight buffer without the padded slice; fall back
-      // to the minimal layout so we still show something correct.
-      if (size < static_cast<size_t>(w) * h * 3 / 2) {
+    // The plane layout has to fit inside the buffer the codec actually handed
+    // over. Some devices report the padded stride/slice but deliver a tight
+    // buffer, and reading the padding ran past the mapping: that was a native
+    // crash the moment a video frame was composited. Fall back to the tight
+    // layout when the padded one does not fit, and refuse the frame when even
+    // that is too short, instead of reading outside it.
+    int stride = stride_ > 0 ? stride_ : w;
+    int slice = slice_h_ > 0 ? slice_h_ : h;
+    auto layout_bytes = [&](int s, int sh) -> size_t {
+      const size_t y = static_cast<size_t>(s) * static_cast<size_t>(sh);
+      const size_t chroma = planar
+          ? static_cast<size_t>(s / 2) * static_cast<size_t>(sh / 2)
+          : static_cast<size_t>(s) * static_cast<size_t>(sh / 2);
+      return y + (planar ? 2 * chroma : chroma);
+    };
+    if (size < layout_bytes(stride, slice)) {
+      stride = w;
+      slice = h;
+      if (size < layout_bytes(stride, slice)) {
         return Error::make(ErrorCode::MediaDecodeFailed, "short YUV buffer");
       }
     }
 
+    const size_t y_size = static_cast<size_t>(stride) * static_cast<size_t>(slice);
+    const size_t chroma_stride = planar ? static_cast<size_t>(stride / 2) : static_cast<size_t>(stride);
+    const size_t chroma_size = chroma_stride * static_cast<size_t>(slice / 2);
+
     const uint8_t* y_plane = yuv;
     const uint8_t* u_plane = yuv + y_size;
-    const uint8_t* v_plane = u_plane + chroma_size;
+    // Only planar formats have a second chroma plane; semi-planar interleaves
+    // U and V in the single plane after luma.
+    const uint8_t* v_plane = planar ? u_plane + chroma_size : nullptr;
 
     for (int y = 0; y < h; ++y) {
-      const uint8_t* yrow = y_plane + static_cast<size_t>(y) * stride;
+      const uint8_t* yrow = y_plane + static_cast<size_t>(y) * static_cast<size_t>(stride);
       uint8_t* drow = out.data() + static_cast<size_t>(y) * out.stride();
       const int cy = y / 2;
       for (int x = 0; x < w; ++x) {
@@ -387,11 +425,11 @@ private:
         const uint8_t* u_src = nullptr;
         const uint8_t* v_src = nullptr;
         if (planar) {
-          u_src = u_plane + static_cast<size_t>(cy) * chroma_stride + cx;
-          v_src = v_plane + static_cast<size_t>(cy) * chroma_stride + cx;
+          u_src = u_plane + static_cast<size_t>(cy) * chroma_stride + static_cast<size_t>(cx);
+          v_src = v_plane + static_cast<size_t>(cy) * chroma_stride + static_cast<size_t>(cx);
           if (swapped_uv) std::swap(u_src, v_src);
         } else {
-          u_src = u_plane + static_cast<size_t>(cy) * chroma_stride + cx * 2;
+          u_src = u_plane + static_cast<size_t>(cy) * chroma_stride + static_cast<size_t>(cx) * 2;
           v_src = u_src + 1;
         }
         yuv_to_rgba(yrow[x], *u_src, *v_src, drow + static_cast<size_t>(x) * 4);

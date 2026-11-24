@@ -198,11 +198,13 @@ struct ProjectSession::Impl {
 
   void ensure_default_tracks() {
     if (!track_list.empty()) return;
-    TrackInfo v, o, a;
+    // One picture track is the whole default project. The old version also laid
+    // down an empty Overlay and Audio lane at creation, so every new project
+    // opened with three layers the user never asked for. Titles and audio land
+    // on this track; a second lane is only created when one is requested.
+    TrackInfo v;
     v.id = next_track++; v.name = "Video 1"; v.type = static_cast<int>(TrackType::Video);
-    o.id = next_track++; o.name = "Overlay"; o.type = static_cast<int>(TrackType::Overlay);
-    a.id = next_track++; a.name = "Audio 1"; a.type = static_cast<int>(TrackType::Audio);
-    track_list = {v, o, a};
+    track_list = {v};
   }
 
   TrackInfo* track_mut(TrackId id) {
@@ -791,8 +793,12 @@ MediaId ProjectSession::import_media(const std::string& path) {
   if (auto dec = create_media_decoder(path)) {
     const MediaProbeResult& real = dec->info();
     if (!real.streams.empty() || real.duration_ms > 0) {
+      const int64_t estimate_ms = pr.duration_ms;
       pr = real;
       pr.ok = true;
+      // A decoder that knows the streams but not their length must not erase
+      // the estimate: that is what cut imported clips to five seconds.
+      if (pr.duration_ms <= 0) pr.duration_ms = estimate_ms;
     }
   }
   if (pr.ok && !pr.streams.empty()) {
@@ -807,7 +813,7 @@ MediaId ProjectSession::import_media(const std::string& path) {
   } else {
     m.width = 1920; m.height = 1080; m.fps = impl_->meta.fps; m.duration = 5.0;
   }
-  if (m.duration <= 0) m.duration = 5.0;
+  if (m.duration <= 0) m.duration = 10.0;
   impl_->media_list.push_back(m);
   impl_->dirty = true;
   return m.id;

@@ -10,6 +10,7 @@ import android.graphics.RectF
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
+import com.motionstudio.app.data.DeviceProfile
 import com.motionstudio.app.editor.EditorEngine
 import com.motionstudio.app.model.PreviewRatio
 import com.motionstudio.app.native.NativeEngine
@@ -65,6 +66,21 @@ class PreviewView(context: Context) : View(context) {
     private var visible = true
 
     private var worker: Thread? = null
+
+    /**
+     * How often a paused preview asks whether anything changed.
+     *
+     * The question itself is one JNI call and a compare; the point of the gap is
+     * to leave the CPU (and the video decoder behind any cached frame) asleep.
+     * A budget phone wakes up a quarter as often as a flagship, and a hidden
+     * preview barely at all. Playback keeps its own frame rate.
+     */
+    private val pausedPollMs: Long = when {
+        DeviceProfile.isLowRam || DeviceProfile.heapClassMb <= 192 ||
+            DeviceProfile.cpuCores <= 2 -> 260L
+        DeviceProfile.cpuCores <= 4 -> 180L
+        else -> 120L
+    }
 
     private val bitmapPaint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
     private val backgroundPaint = Paint().apply { color = Color.parseColor("#0B0B0E") }
@@ -198,7 +214,11 @@ class PreviewView(context: Context) : View(context) {
                 // Playback wants every frame the renderer can manage; a paused
                 // playhead only needs to notice edits, and that poll is a single
                 // native call that usually returns "nothing changed".
-                val delay = if (lastPlaying) 16L else 60L
+                val delay = when {
+                    lastPlaying -> 16L
+                    !visible -> 500L
+                    else -> pausedPollMs
+                }
                 try {
                     Thread.sleep(delay)
                 } catch (_: InterruptedException) {

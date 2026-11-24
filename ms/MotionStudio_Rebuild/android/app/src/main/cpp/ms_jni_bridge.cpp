@@ -3,6 +3,7 @@
 #include <jni.h>
 #include <android/bitmap.h>
 #include <android/log.h>
+#include <exception>
 #include <string>
 #include <vector>
 #include "bridge/ms_bridge.h"
@@ -28,6 +29,26 @@ jdoubleArray to_doubles(JNIEnv* env, const double* values, jsize count) {
 
 jstring to_jstring(JNIEnv* env, const std::string& value) {
     return env->NewStringUTF(value.c_str());
+}
+
+/**
+ * A C++ exception that reaches the JNI boundary terminates the process, and a
+ * failed decode or a rejected codec configuration throws inside the engine.
+ * These entry points are the ones a media import walks through, so catching
+ * there turns "the app closed when I added a video" into a failed import the
+ * Kotlin side already reports.
+ */
+template <typename Fn>
+auto guarded(const char* what, Fn&& fn) -> decltype(fn()) {
+    using R = decltype(fn());
+    try {
+        return fn();
+    } catch (const std::exception& e) {
+        LOGE("%s threw: %s", what, e.what());
+    } catch (...) {
+        LOGE("%s threw an unknown exception", what);
+    }
+    return R{};
 }
 
 } // namespace
@@ -91,7 +112,7 @@ Java_com_motionstudio_app_native_NativeEngine_nativePause(JNIEnv*, jobject) { ms
 
 JNIEXPORT jboolean JNICALL
 Java_com_motionstudio_app_native_NativeEngine_nativeRenderFrame(JNIEnv*, jobject) {
-    return ms_render_frame() == 0 ? JNI_TRUE : JNI_FALSE;
+    return guarded("renderFrame", [] { return ms_render_frame() == 0 ? JNI_TRUE : JNI_FALSE; });
 }
 
 JNIEXPORT jlong JNICALL
@@ -124,14 +145,14 @@ Java_com_motionstudio_app_native_NativeEngine_nativeCopyFrame(JNIEnv* env, jobje
 JNIEXPORT jint JNICALL
 Java_com_motionstudio_app_native_NativeEngine_nativeImportMedia(JNIEnv* env, jobject, jstring path) {
     const std::string p = to_std(env, path);
-    return ms_import_media(p.c_str());
+    return guarded("importMedia", [&p] { return ms_import_media(p.c_str()); });
 }
 
 JNIEXPORT jint JNICALL
 Java_com_motionstudio_app_native_NativeEngine_nativeAddClip(JNIEnv*, jobject, jint trackId,
                                                             jint mediaId, jdouble start,
                                                             jdouble duration) {
-    return ms_add_clip(trackId, mediaId, start, duration);
+    return guarded("addClip", [=] { return ms_add_clip(trackId, mediaId, start, duration); });
 }
 
 JNIEXPORT jint JNICALL

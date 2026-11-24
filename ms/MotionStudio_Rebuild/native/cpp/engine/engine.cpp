@@ -1589,6 +1589,10 @@ ClipId Engine::add_clip(TrackId track, MediaId media, TimeSec start, TimeSec dur
     c.motion.ensure_defaults();
     const ClipId id = project_->add_clip(track, c);
     if (!id) return 0;
+    // The project's own length follows its content. Without this an edit longer
+    // than the 15 s default was only longer for the current session: the saved
+    // document still declared 15 s and reopened short.
+    project_->meta().duration = std::max(project_->meta().duration, c.start + c.duration);
     project_->mark_dirty();
     invalidate_frames();
     return id;

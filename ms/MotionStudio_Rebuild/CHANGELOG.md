@@ -1,5 +1,59 @@
 # Changelog
 
+## Unreleased — 32-bit installs, a calmer preview and real clip lengths
+
+### Added
+- **A 32-bit ARM slice, so budget phones can install the APK.** The phone build now
+  carries `armeabi-v7a` next to `arm64-v8a`; `-Pemulator` still swaps in `x86_64`. The
+  second slice costs 1.4 MB of native code (`libc++_shared` and the engine for 32-bit ARM)
+- **SCRIPT workspace — expressions over the selected clip.** Type an expression in `t`
+  (seconds inside the clip), pick Opacity, Scale, X or Y, and bake it: the value is sampled
+  once per frame and written as keyframes, so preview, export and the saved project all see
+  the same curve. The language is small and total — `+ - * / % ^`, parentheses, `t`/`time`,
+  `fps`, `pi`, `sin cos tan abs sqrt floor ceil round min max pow clamp` — and every mistake
+  comes back as a readable message. Presets: fade in, pulse, drift, shake, pop
+
+### Fixed
+- **An imported video keeps its real length.** Android's decoder track format usually
+  omits `DURATION`, so `info().duration_ms` was 0 and `import_media` replaced the probe's
+  estimate with zero, then cut the clip to 5 s. The sequence therefore ended at the project's
+  default 15 s and the playhead appeared to stop there. The decoder now falls back to the
+  container duration and then to the last sample time, `import_media` never overwrites a
+  known length with zero, and the Kotlin import path also asks
+  `MediaMetadataRetriever` for the container length. Added clips grow the project duration
+- **The video-import crash path is bounds-checked.** YUV conversion assumed the codec's
+  padded stride/slice fit the buffer it delivered; on devices that hand over a tight buffer
+  that read past the mapping. The layout is now validated against the real buffer size,
+  semi-planar chroma is treated as one interleaved plane, and the frame is refused rather
+  than read out of bounds. JNI entry points that touch media (`importMedia`, `addClip`,
+  `renderFrame`) also catch C++ exceptions instead of letting one abort the process
+- **A new project no longer opens with three empty lanes.** `Video 1` is the only default
+  track; Overlay and Audio are no longer created until something needs them. Titles go on
+  the picture track
+
+### Changed
+- **The editor layout gives the picture the space.** One 48 dp header (name, clock,
+  undo/redo, settings, export), a 46 dp transport, a single 58 dp tool rail, a 34 dp tab
+  row, then the workspace. That is about 36 dp less fixed chrome than the header + transport
+  + tab row + panel + labelled dock stack it replaces, and the dock and the tabs no longer
+  compete for the same strip. Tabs are compact pills and SCRIPT joins them
+- **A paused preview polls less often.** The idle poll is 260 ms on a low-RAM phone (or a
+  192 MB heap, or two cores), 180 ms up to four cores, 120 ms otherwise, and 500 ms while the
+  viewport is hidden. Playback is unchanged at 16 ms, and the signature check still skips
+  compositing when nothing has changed
+
+### Verified
+- `:app:assembleRelease` succeeds in 3m 34s: **7,941,362 bytes** (6,535,559 before the
+  32-bit slice), `native-code: 'arm64-v8a' 'armeabi-v7a'`, `minSdk 29`, signed
+  `CN=Android Debug`
+- JVM unit tests: `ScriptExpressionTest` 7/7, `DeviceProfileTest` 4/4
+- Native suite: 29/30; `ms_audio_playback_test` still the only failure (no `ffmpeg` CLI here
+  for its fixtures). `ms_11_16_test` now asserts that the saved document keeps both the
+  default lane and the one it adds, instead of assuming three defaults
+- Not verified: no device here. The APK has not been installed, so the 32-bit start-up,
+  the import crash fix, the real clip lengths, expression baking in the preview and the new
+  layout have not been seen running on a phone
+
 ## Unreleased — slimmer install
 
 ### Changed

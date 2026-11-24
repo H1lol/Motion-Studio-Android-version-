@@ -30,6 +30,7 @@ import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.BlurOn
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.OpenWith
@@ -66,6 +67,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import android.media.MediaMetadataRetriever
 import com.motionstudio.app.editor.EditorEngine
 import com.motionstudio.app.editor.TitleOptions
 import com.motionstudio.app.native.NativeEngine
@@ -84,10 +86,11 @@ import java.io.File
  */
 private enum class Workspace(val label: String) {
     Timeline("TIMELINE"),
-    Nodes("NODES"),
-    Keys("KEYS"),
-    Grade("GRADE"),
     Clip("CLIP"),
+    Keys("KEYS"),
+    Script("SCRIPT"),
+    Grade("GRADE"),
+    Nodes("NODES"),
 }
 
 @Composable
@@ -136,10 +139,24 @@ fun EditorScreen(
                         file.delete()
                         return@runCatching false
                     }
+                    // The platform's metadata reader knows the container length
+                    // even when the native decoder's track format does not. A
+                    // clip cut to five seconds used to make the whole sequence
+                    // look like it stopped at the project's default length.
+                    val fallbackSeconds = runCatching {
+                        MediaMetadataRetriever().use { retriever ->
+                            retriever.setDataSource(file.absolutePath)
+                            val ms = retriever
+                                .extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                                ?.toLongOrNull() ?: 0L
+                            ms / 1000.0
+                        }
+                    }.getOrDefault(0.0)
                     engine.importMedia(
                         file.absolutePath,
                         name,
                         appendToEnd = engine.appendImportsAtEnd,
+                        fallbackDuration = fallbackSeconds,
                     )
                 }.getOrDefault(false)
             }
@@ -167,32 +184,26 @@ fun EditorScreen(
                     onSettings = { showMore = true },
                     onExport = { showExport = true },
                 )
+                // One rail, one row of tabs, and the picture gets everything
+                // else. The previous layout stacked a header, a full transport
+                // strip, a tab row, the panel AND a labelled dock between the
+                // viewer and the timeline edge — about 220 dp of chrome, which
+                // is most of a 640 dp-tall phone.
+                val pickMedia = {
+                    picker.launch(arrayOf("video/*", "audio/*", "image/*"))
+                }
                 if (landscape) {
                     Row(Modifier.weight(1f).fillMaxWidth()) {
-                        Column(Modifier.weight(0.60f).fillMaxHeight()) {
+                        Column(Modifier.weight(0.62f).fillMaxHeight()) {
                             Viewport(engine, modifier = Modifier.weight(1f))
                             TransportBar(engine)
                         }
                         Column(
-                            Modifier.weight(0.40f).fillMaxHeight()
+                            Modifier.weight(0.38f).fillMaxHeight()
                                 .border(1.dp, MsColors.borderSoft)
                         ) {
-                            WorkspaceTabs(selected = workspace, onSelect = { workspace = it })
-                            WorkspacePanel(
-                                engine = engine,
-                                workspace = workspace,
-                                modifier = Modifier.weight(1f),
-                                onImport = {
-                                    picker.launch(arrayOf("video/*", "audio/*", "image/*"))
-                                },
-                                onInspect = { workspace = Workspace.Clip },
-                                onOpenEffects = { showEffects = true },
-                                onOpenText = { showText = true },
-                                onOpenMask = { showMask = true },
-                                onOpenMotion = { showMotion = true },
-                            )
-                            ToolDock(
-                                onImport = { picker.launch(arrayOf("video/*", "audio/*", "image/*")) },
+                            ToolRail(
+                                onImport = pickMedia,
                                 onText = {
                                     engine.addTitle("TITLE", TitleOptions())
                                     showText = true
@@ -203,28 +214,28 @@ fun EditorScreen(
                                 onMotion = { showMotion = true },
                                 onMask = { showMask = true },
                                 onAudio = { showAudio = true },
+                                onScript = { workspace = Workspace.Script },
                                 onMore = { showMore = true },
+                            )
+                            WorkspaceTabs(selected = workspace, onSelect = { workspace = it })
+                            WorkspacePanel(
+                                engine = engine,
+                                workspace = workspace,
+                                modifier = Modifier.weight(1f),
+                                onImport = pickMedia,
+                                onInspect = { workspace = Workspace.Clip },
+                                onOpenEffects = { showEffects = true },
+                                onOpenText = { showText = true },
+                                onOpenMask = { showMask = true },
+                                onOpenMotion = { showMotion = true },
                             )
                         }
                     }
                 } else {
                     Viewport(engine, modifier = Modifier.weight(1f))
                     TransportBar(engine)
-                    WorkspaceTabs(selected = workspace, onSelect = { workspace = it })
-                    WorkspacePanel(
-                        engine = engine,
-                        workspace = workspace,
-                        // The timeline is where the work happens; give it the room.
-                        modifier = Modifier.weight(1.25f),
-                        onImport = { picker.launch(arrayOf("video/*", "audio/*", "image/*")) },
-                        onInspect = { workspace = Workspace.Clip },
-                        onOpenEffects = { showEffects = true },
-                        onOpenText = { showText = true },
-                        onOpenMask = { showMask = true },
-                        onOpenMotion = { showMotion = true },
-                    )
-                    ToolDock(
-                        onImport = { picker.launch(arrayOf("video/*", "audio/*", "image/*")) },
+                    ToolRail(
+                        onImport = pickMedia,
                         onText = {
                             engine.addTitle("TITLE", TitleOptions())
                             showText = true
@@ -235,7 +246,21 @@ fun EditorScreen(
                         onMotion = { showMotion = true },
                         onMask = { showMask = true },
                         onAudio = { showAudio = true },
+                        onScript = { workspace = Workspace.Script },
                         onMore = { showMore = true },
+                    )
+                    WorkspaceTabs(selected = workspace, onSelect = { workspace = it })
+                    WorkspacePanel(
+                        engine = engine,
+                        workspace = workspace,
+                        // The timeline is where the work happens; give it the room.
+                        modifier = Modifier.weight(1f),
+                        onImport = pickMedia,
+                        onInspect = { workspace = Workspace.Clip },
+                        onOpenEffects = { showEffects = true },
+                        onOpenText = { showText = true },
+                        onOpenMask = { showMask = true },
+                        onOpenMotion = { showMotion = true },
                     )
                 }
             }
@@ -289,6 +314,7 @@ private fun WorkspacePanel(
         )
         Workspace.Nodes -> NodeGraphPane(engine, modifier.fillMaxWidth())
         Workspace.Keys -> KeyframePane(engine, modifier.fillMaxWidth())
+        Workspace.Script -> ScriptPane(engine, modifier.fillMaxWidth())
         Workspace.Grade -> GradePane(engine, modifier.fillMaxWidth())
         Workspace.Clip -> ClipPane(
             engine = engine,
@@ -317,30 +343,32 @@ private fun EditorHeader(
 ) {
     Column {
         Row(
-            Modifier.fillMaxWidth().height(58.dp).background(MsColors.surface)
-                .padding(start = 2.dp, end = 10.dp),
+            Modifier.fillMaxWidth().height(48.dp).background(MsColors.surface)
+                .padding(start = 2.dp, end = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconButton(onClick = onBack, modifier = Modifier.size(40.dp)) {
+            IconButton(onClick = onBack, modifier = Modifier.size(36.dp)) {
                 Icon(
                     Icons.AutoMirrored.Filled.ArrowBack,
                     "Back to projects",
                     tint = MsColors.textSecondary,
                 )
             }
+            // One line for identity, one for the clock: a two-storey title block
+            // costs 10 dp of picture on every phone.
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         engine.doc.name.ifBlank { "Untitled" },
                         color = MsColors.textPrimary,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         modifier = Modifier.weight(1f, fill = false),
                     )
-                    Spacer(Modifier.width(7.dp))
+                    Spacer(Modifier.width(6.dp))
                     Box(
-                        Modifier.size(5.dp).background(
+                        Modifier.size(4.dp).background(
                             if (engine.dirty) MsColors.warning else MsColors.success,
                             CircleShape,
                         )
@@ -348,22 +376,28 @@ private fun EditorHeader(
                 }
                 HeaderClock(engine)
             }
-            IconButton(onClick = onSettings, modifier = Modifier.size(38.dp)) {
+            IconButton(onClick = { engine.undo() }, modifier = Modifier.size(34.dp)) {
+                Icon(Icons.AutoMirrored.Filled.Undo, "Undo", tint = MsColors.textSecondary)
+            }
+            IconButton(onClick = { engine.redo() }, modifier = Modifier.size(34.dp)) {
+                Icon(Icons.AutoMirrored.Filled.Redo, "Redo", tint = MsColors.textSecondary)
+            }
+            IconButton(onClick = onSettings, modifier = Modifier.size(34.dp)) {
                 Icon(Icons.Filled.Settings, "Settings", tint = MsColors.textSecondary)
             }
             Box(
                 Modifier
-                    .height(34.dp)
+                    .height(32.dp)
                     .clip(RoundedCornerShape(9.dp))
                     .background(MsColors.accent)
                     .clickable { onExport() }
-                    .padding(horizontal = 16.dp),
+                    .padding(horizontal = 14.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     "Export",
                     color = MsColors.background,
-                    fontSize = 13.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                 )
             }
@@ -375,33 +409,29 @@ private fun EditorHeader(
 @Composable
 private fun WorkspaceTabs(selected: Workspace, onSelect: (Workspace) -> Unit) {
     Row(
-        Modifier.fillMaxWidth().height(42.dp).background(MsColors.surface)
-            .horizontalScroll(rememberScrollState()),
+        Modifier.fillMaxWidth().height(34.dp).background(MsColors.surface)
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         Workspace.entries.forEach { tab ->
             val active = tab == selected
-            Column(
+            Box(
                 Modifier
-                    .height(42.dp)
+                    .height(26.dp)
+                    .clip(RoundedCornerShape(7.dp))
+                    .background(if (active) MsColors.accentDim else Color.Transparent)
                     .clickable { onSelect(tab) }
-                    .padding(horizontal = 16.dp, vertical = 6.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
+                    .padding(horizontal = 11.dp),
+                contentAlignment = Alignment.Center,
             ) {
                 Text(
                     tab.label,
-                    color = if (active) MsColors.textPrimary else MsColors.textTertiary,
-                    fontSize = 11.sp,
+                    color = if (active) MsColors.accentSoft else MsColors.textTertiary,
+                    fontSize = 10.sp,
                     fontFamily = MsFonts.mono,
                     fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
-                )
-                Spacer(Modifier.height(4.dp))
-                Box(
-                    Modifier
-                        .width(if (active) 18.dp else 0.dp)
-                        .height(2.dp)
-                        .background(if (active) MsColors.accent else Color.Transparent)
                 )
             }
         }
@@ -557,17 +587,17 @@ private fun TransportBar(engine: EditorEngine) {
     Column {
         Box(Modifier.fillMaxWidth().height(1.dp).background(MsColors.border))
         Row(
-            Modifier.fillMaxWidth().height(54.dp).background(MsColors.surface)
+            Modifier.fillMaxWidth().height(46.dp).background(MsColors.surface)
                 .padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            IconButton(onClick = { engine.jumpToKeyframe(-1) }, modifier = Modifier.size(40.dp)) {
+            IconButton(onClick = { engine.jumpToKeyframe(-1) }, modifier = Modifier.size(36.dp)) {
                 Icon(Icons.Filled.SkipPrevious, "Previous keyframe", tint = MsColors.textSecondary)
             }
             Box(
                 Modifier
-                    .size(42.dp)
+                    .size(36.dp)
                     .background(MsColors.accent, CircleShape)
                     .clickable { engine.togglePlay() },
                 contentAlignment = Alignment.Center,
@@ -576,21 +606,14 @@ private fun TransportBar(engine: EditorEngine) {
                     if (engine.playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                     if (engine.playing) "Pause" else "Play",
                     tint = Color.Black,
-                    modifier = Modifier.size(24.dp),
+                    modifier = Modifier.size(21.dp),
                 )
             }
-            IconButton(onClick = { engine.jumpToKeyframe(1) }, modifier = Modifier.size(40.dp)) {
+            IconButton(onClick = { engine.jumpToKeyframe(1) }, modifier = Modifier.size(36.dp)) {
                 Icon(Icons.Filled.SkipNext, "Next keyframe", tint = MsColors.textSecondary)
             }
             Spacer(Modifier.weight(1f))
             TransportClock(engine)
-            Spacer(Modifier.width(10.dp))
-            IconButton(onClick = { engine.undo() }, modifier = Modifier.size(38.dp)) {
-                Icon(Icons.AutoMirrored.Filled.Undo, "Undo", tint = MsColors.textSecondary)
-            }
-            IconButton(onClick = { engine.redo() }, modifier = Modifier.size(38.dp)) {
-                Icon(Icons.AutoMirrored.Filled.Redo, "Redo", tint = MsColors.textSecondary)
-            }
         }
     }
 }
@@ -600,8 +623,15 @@ private fun TransportBar(engine: EditorEngine) {
  * Mono-labelled chips were the previous rail and they read as debug output; a
  * layer tool has to look like something you press.
  */
+/**
+ * The one action rail: everything you can add to the edit, in thumb reach.
+ *
+ * It used to be a separate dock under the tabs, so the timeline's own toolbar
+ * and the tools competed for the same 66 dp. One rail, directly above the tabs,
+ * and the timeline keeps its height.
+ */
 @Composable
-private fun ToolDock(
+private fun ToolRail(
     onImport: () -> Unit,
     onText: () -> Unit,
     onEffects: () -> Unit,
@@ -610,6 +640,7 @@ private fun ToolDock(
     onMotion: () -> Unit,
     onMask: () -> Unit,
     onAudio: () -> Unit,
+    onScript: () -> Unit,
     onMore: () -> Unit,
 ) {
     Column {
@@ -617,12 +648,12 @@ private fun ToolDock(
         Row(
             Modifier
                 .fillMaxWidth()
-                .height(66.dp)
+                .height(58.dp)
                 .background(MsColors.surface)
                 .horizontalScroll(rememberScrollState())
                 .padding(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            horizontalArrangement = Arrangement.spacedBy(0.dp),
         ) {
             DockButton(Icons.Filled.VideoLibrary, "Media", onImport)
             DockButton(Icons.Filled.TextFields, "Text", onText)
@@ -632,6 +663,7 @@ private fun ToolDock(
             DockButton(Icons.Filled.OpenWith, "Motion", onMotion)
             DockButton(Icons.Filled.BlurOn, "Mask", onMask)
             DockButton(Icons.Filled.GraphicEq, "Audio", onAudio)
+            DockButton(Icons.Filled.Code, "Script", onScript)
             DockButton(Icons.Filled.MoreHoriz, "More", onMore)
         }
     }
@@ -641,16 +673,16 @@ private fun ToolDock(
 private fun DockButton(icon: ImageVector, label: String, onClick: () -> Unit) {
     Column(
         Modifier
-            .width(62.dp)
-            .height(58.dp)
+            .width(56.dp)
+            .height(52.dp)
             .clip(RoundedCornerShape(8.dp))
             .clickable(onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Icon(icon, label, tint = MsColors.accentSoft, modifier = Modifier.size(24.dp))
-        Spacer(Modifier.height(5.dp))
-        Text(label, color = MsColors.textSecondary, fontSize = 10.sp, maxLines = 1)
+        Icon(icon, label, tint = MsColors.accentSoft, modifier = Modifier.size(22.dp))
+        Spacer(Modifier.height(4.dp))
+        Text(label, color = MsColors.textSecondary, fontSize = 9.sp, maxLines = 1)
     }
 }
 
