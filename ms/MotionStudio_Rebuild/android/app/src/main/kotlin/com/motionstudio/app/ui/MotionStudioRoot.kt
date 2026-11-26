@@ -37,6 +37,11 @@ fun MotionStudioRoot(settings: SettingsStore) {
     LifecycleEventEffect(Lifecycle.Event.ON_PAUSE) {
         engine?.maybeAutosave()
     }
+    // ON_PAUSE can arrive while the interval has not elapsed; ON_STOP is the
+    // last point before the OS may reclaim the process, so write unconditionally.
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
+        engine?.forceAutosave()
+    }
 
     MotionStudioTheme(accent = settings.accent) {
         // Without the engine there is no editor to show. Replacing the UI here
@@ -89,6 +94,23 @@ fun MotionStudioRoot(settings: SettingsStore) {
                         Toast.makeText(
                             context,
                             created.lastError ?: "Could not open that project",
+                            Toast.LENGTH_SHORT,
+                        ).show()
+                    }
+                },
+                onRestoreProject = { file ->
+                    val created = runCatching { EditorEngine(store) { settings.autosaveEnabled } }
+                        .getOrNull()
+                    if (created == null) {
+                        Diagnostics.note("EditorEngine construction threw during recovery")
+                        Toast.makeText(context, "The engine could not start", Toast.LENGTH_LONG).show()
+                    } else if (created.openRecovered(file)) {
+                        engine = created
+                    } else {
+                        created.release()
+                        Toast.makeText(
+                            context,
+                            created.lastError ?: "Could not recover that project",
                             Toast.LENGTH_SHORT,
                         ).show()
                     }

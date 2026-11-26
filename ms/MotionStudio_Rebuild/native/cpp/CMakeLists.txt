@@ -227,6 +227,14 @@ target_link_libraries(ms_effects_looks_test PRIVATE ms_core)
 add_executable(ms_loudness_test tools/ms_loudness_test.cpp)
 target_link_libraries(ms_loudness_test PRIVATE ms_core)
 
+# Golden-image regression: renders a fixed scene through the CPU effects and
+# compares the pixels with tests/golden/*.pam. The goldens live in the source
+# tree so a pixel regression fails the build, not just a logic assertion.
+add_executable(ms_render_golden_test tools/ms_render_golden_test.cpp)
+target_link_libraries(ms_render_golden_test PRIVATE ms_core)
+target_compile_definitions(ms_render_golden_test PRIVATE
+  MS_GOLDEN_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/golden")
+
 add_executable(ms_engine_audio_test tools/ms_engine_audio_test.cpp)
 target_link_libraries(ms_engine_audio_test PRIVATE motionstudio_native)
 
@@ -268,6 +276,7 @@ add_test(NAME ms_effects_screen_test COMMAND ms_effects_screen_test)
 add_test(NAME ms_effects_motion_test COMMAND ms_effects_motion_test)
 add_test(NAME ms_effects_looks_test COMMAND ms_effects_looks_test)
 add_test(NAME ms_loudness_test COMMAND ms_loudness_test)
+add_test(NAME ms_render_golden_test COMMAND ms_render_golden_test)
 set_tests_properties(
   ms_studio_test ms_pass345_deep ms_pass6_test ms_11_16_test ms_17_22_test
   ms_23_30_test ms_audio_fx_test ms_audio_playback_test ms_graph_safety_test ms_export_profile_test

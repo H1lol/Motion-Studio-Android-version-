@@ -60,12 +60,16 @@ private val resolutions = listOf(
 fun StarterScreen(
     store: ProjectStore,
     onOpenProject: (File) -> Unit,
+    onRestoreProject: (File) -> Unit,
     onCreateProject: (String, Int, Int, Double) -> Unit,
     onSettings: () -> Unit,
 ) {
     var showNew by remember { mutableStateOf(false) }
     var refreshKey by remember { mutableIntStateOf(0) }
     val projects = remember(refreshKey) { store.projects() }
+    // Autosaves newer than their project file: the work the OS killed before it
+    // could be saved. They are offered back before the project list.
+    val recovered = remember(refreshKey) { store.recoverable() }
 
     Column(
         Modifier
@@ -173,6 +177,52 @@ fun StarterScreen(
                     )
                 }
                 Text("›", color = MsColors.accent, fontSize = 18.sp)
+            }
+
+            if (recovered.isNotEmpty()) {
+                Spacer(Modifier.height(20.dp))
+                SectionLabel("UNSAVED WORK", "${recovered.size}")
+                Spacer(Modifier.height(6.dp))
+                recovered.forEach { entry ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 6.dp)
+                            .background(MsColors.surface, RoundedCornerShape(2.dp))
+                            .border(1.dp, MsColors.warning, RoundedCornerShape(2.dp))
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                entry.name,
+                                color = MsColors.textPrimary,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                            )
+                            Text(
+                                "autosaved " + SimpleDateFormat(
+                                    "d MMM HH:mm", Locale.getDefault(),
+                                ).format(Date(entry.savedAt)),
+                                color = MsColors.textMuted,
+                                fontSize = 9.sp,
+                                fontFamily = MsFonts.mono,
+                            )
+                        }
+                        TextButton(onClick = {
+                            refreshKey++
+                            onRestoreProject(entry.file)
+                        }) {
+                            Text("Recover", color = MsColors.accentSoft, fontSize = 12.sp)
+                        }
+                        TextButton(onClick = {
+                            store.clearAutosave(entry.name)
+                            refreshKey++
+                        }) {
+                            Text("Discard", color = MsColors.textTertiary, fontSize = 12.sp)
+                        }
+                    }
+                }
             }
 
             Spacer(Modifier.height(20.dp))

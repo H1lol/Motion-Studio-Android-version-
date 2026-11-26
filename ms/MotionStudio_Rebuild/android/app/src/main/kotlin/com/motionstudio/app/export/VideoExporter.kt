@@ -9,6 +9,7 @@ import android.media.MediaCodec
 import android.media.MediaCodecInfo
 import android.media.MediaFormat
 import android.media.MediaMuxer
+import com.motionstudio.app.diag.Diagnostics
 import com.motionstudio.app.editor.EditorEngine
 import com.motionstudio.app.native.NativeEngine
 import java.io.File
@@ -35,14 +36,23 @@ class VideoExporter(private val engine: EditorEngine) {
         val hasAudio: Boolean,
         val error: String?,
         val note: String? = null,
+        /** The caller asked to stop; the partial file was deleted. */
+        val cancelled: Boolean = false,
     )
 
     private class Pending(val track: Int, val data: ByteArray, val ptsUs: Long, val flags: Int)
 
+    /**
+     * [isCancelled] is polled once per frame. A cancel stops the loop, deletes
+     * the partial file and still runs the cleanup that restores proxies, the
+     * preview scale and the playhead — an abandoned encode must not leave the
+     * editor in export mode.
+     */
     fun export(
         outFile: File,
         settings: ExportSettings,
         onProgress: (Float) -> Unit = {},
+        isCancelled: () -> Boolean = { false },
     ): Result {
         val width = settings.evenWidth
         val height = settings.evenHeight
@@ -212,6 +222,14 @@ class VideoExporter(private val engine: EditorEngine) {
             val audioBytes = ByteArray(audioChunk * channels * 2)
 
             while (!videoDone) {
+                if (isCancelled()) {
+                    runCatching { outFile.delete() }
+                    Diagnostics.note("export cancelled after $framesWritten frame(s)")
+                    return Result(
+                        null, framesWritten, audioMuxed, null, note, cancelled = true,
+                    )
+                }
+
                 // --- video input
                 if (framesQueued < totalFrames) {
                     val inIndex = firstEncoder.dequeueInputBuffer(5_000L)

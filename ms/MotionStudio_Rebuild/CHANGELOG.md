@@ -1,6 +1,46 @@
 # Changelog
 
-## Unreleased — 32-bit installs, a calmer preview and real clip lengths
+## Unreleased — pixels under test, recovery that works, stoppable jobs
+
+### Added
+- **Golden-image regression test.** `ms_render_golden_test` renders a fixed scene
+  through eleven effects (blur, glow, chromatic, wave warp, kaleidoscope, halftone,
+  vhs, twirl, pixelate, duotone, saturation) and compares the result against
+  `native/cpp/tests/golden/*.pam` with a tolerance of 8 per channel and 0.75 mean.
+  It also asserts every effect actually changes pixels and that a repeated render is
+  byte-identical, so a regenerated golden cannot hide a no-op effect. Rewrite the
+  goldens deliberately with `--write` after inspecting the diff
+- **Crash recovery on the starter screen.** `ProjectStore.recoverable()` lists
+  autosaves newer than their project file; they appear as **Unsaved work** with
+  Recover and Discard. `openRecovered()` reopens one as a dirty document whose next
+  save writes a normal project, and saving deletes the recovery copy
+- `forceAutosave()` runs on `ON_STOP`, so a background kill no longer costs the up
+  to ten minutes the interval-based autosave could miss
+- Cancel buttons for export and proxy generation
+- `docs/INDUSTRY_STANDARD_GAP.md`: the desktop-suite specification mapped against
+  what this app actually has, the deliberate omissions, and the phase plan
+
+### Fixed
+- **Long jobs can be stopped.** `VideoExporter.export` and `ProxyGenerator.generate`
+  poll a cancellation callback once per frame, delete the partial `.mp4`/`.part`
+  file, and still run the cleanup that restores proxies, preview scale and the
+  playhead. Before this, a mistaken 4K export held the app until it finished
+- **CI covers what ships.** The workflow now runs the native suite (32 tests, ffmpeg
+  installed for the audio fixture) and builds the *release* APK; previously only the
+  debug APK was built and no native test ran
+
+### Verified
+- Native: 32/32 tests pass with `ctest` except `ms_audio_playback_test`, which needs
+  an `ffmpeg` CLI for its fixture (installed in CI, absent in this container).
+  `ms_render_golden_test` PASSED on all eleven effects
+- JVM: 29/29 (`ScriptExpressionTest` 7, `ProjectDocTest` 6, `MediaImportRulesTest` 4,
+  `RecoveryRulesTest` 4, `DeviceProfileTest` 4, `TimelineRulerTest` 4)
+- `:app:assembleRelease` succeeds in 11m 33s: **7,941,362 bytes**,
+  `native-code: 'arm64-v8a' 'armeabi-v7a'`, `minSdk 29`, version `2026.1.0`
+- Not verified: no device here. Recovery after a real OS kill, the Cancel buttons
+  mid-encode, and the starter-screen banner are compile- and test-checked only
+
+## Previous batch — 32-bit installs, a calmer preview and real clip lengths
 
 ### Added
 - **A 32-bit ARM slice, so budget phones can install the APK.** The phone build now

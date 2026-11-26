@@ -72,6 +72,9 @@ fun MoreSheet(
     var proxyProgress by remember { mutableFloatStateOf(0f) }
     var proxyStatus by remember { mutableStateOf<String?>(null) }
     var proxyRevision by remember { mutableIntStateOf(0) }
+    // Building proxies for a 4K source takes minutes on a phone; it has to be
+    // stoppable without killing the app.
+    val proxyCancel = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
@@ -270,6 +273,7 @@ fun MoreSheet(
                             proxyBusy = true
                             proxyProgress = 0f
                             proxyStatus = null
+                            proxyCancel.set(false)
                             val missing = withContext(Dispatchers.IO) { ProxyStore.missing(media) }
                             if (missing.isEmpty()) {
                                 proxyStatus =
@@ -278,10 +282,15 @@ fun MoreSheet(
                                 var done = 0
                                 var failed = 0
                                 for ((index, m) in missing.withIndex()) {
+                                    if (proxyCancel.get()) break
                                     val result = withContext(Dispatchers.IO) {
-                                        ProxyGenerator.generate(m.path) { p ->
-                                            proxyProgress = (index + p) / missing.size
-                                        }
+                                        ProxyGenerator.generate(
+                                            m.path,
+                                            isCancelled = { proxyCancel.get() },
+                                            onProgress = { p ->
+                                                proxyProgress = (index + p) / missing.size
+                                            },
+                                        )
                                     }
                                     when (result) {
                                         is ProxyGenerator.Result.Done -> {
@@ -292,12 +301,17 @@ fun MoreSheet(
                                         }
                                         is ProxyGenerator.Result.Skipped -> done++
                                         is ProxyGenerator.Result.Failed -> failed++
+                                        is ProxyGenerator.Result.Cancelled -> Unit
                                     }
                                 }
-                                proxyStatus = buildString {
-                                    append("Built $done of ${missing.size} proxy file(s)")
-                                    if (failed > 0) append(", $failed failed")
-                                    append("\nPlayback uses them now; export re-reads the source.")
+                                proxyStatus = if (proxyCancel.get()) {
+                                    "Proxy build cancelled — the copies already finished are kept."
+                                } else {
+                                    buildString {
+                                        append("Built $done of ${missing.size} proxy file(s)")
+                                        if (failed > 0) append(", $failed failed")
+                                        append("\nPlayback uses them now; export re-reads the source.")
+                                    }
                                 }
                             }
                             proxyBusy = false
@@ -314,6 +328,11 @@ fun MoreSheet(
                         color = MsColors.accentSoft,
                         fontSize = 13.sp,
                     )
+                }
+                if (proxyBusy) {
+                    TextButton(onClick = { proxyCancel.set(true) }) {
+                        Text("Cancel", color = MsColors.error, fontSize = 13.sp)
+                    }
                 }
                 TextButton(
                     enabled = !proxyBusy && proxyFiles > 0,

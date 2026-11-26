@@ -34,6 +34,8 @@ object ProxyGenerator {
         /** The source is already small enough; a proxy would not help. */
         data class Skipped(val reason: String) : Result
         data class Failed(val message: String) : Result
+        /** The caller stopped it; the partial file was removed. */
+        data class Cancelled(val frames: Int) : Result
     }
 
     /** Width/height of the video track, or null when the file has no video. */
@@ -70,7 +72,11 @@ object ProxyGenerator {
         return w to h
     }
 
-    fun generate(mediaPath: String, onProgress: (Float) -> Unit = {}): Result {
+    fun generate(
+        mediaPath: String,
+        isCancelled: () -> Boolean = { false },
+        onProgress: (Float) -> Unit = {},
+    ): Result {
         val source = File(mediaPath)
         if (!source.isFile) return Result.Failed("source file is gone: ${source.name}")
         val (sw, sh) = sourceSize(mediaPath)
@@ -252,6 +258,12 @@ object ProxyGenerator {
                     }
                 }
                 drainEncoder(0L)
+
+                if (isCancelled()) {
+                    temp.delete()
+                    Diagnostics.note("proxy cancelled: ${source.name} after $frames frames")
+                    return Result.Cancelled(frames)
+                }
 
                 if (durationUs > 0) onProgress((lastPtsUs.toFloat() / durationUs).coerceIn(0f, 1f))
             }

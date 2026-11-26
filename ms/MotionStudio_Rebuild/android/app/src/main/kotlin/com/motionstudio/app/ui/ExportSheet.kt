@@ -71,6 +71,9 @@ fun ExportSheet(engine: EditorEngine, onDismiss: () -> Unit) {
     var busy by remember { mutableStateOf(false) }
     var progress by remember { mutableFloatStateOf(0f) }
     var message by remember { mutableStateOf<String?>(null) }
+    // A long encode on a budget phone must be stoppable; the exporter polls this
+    // once per frame and cleans up after itself.
+    val cancelRequested = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
 
     fun sync(s: ExportSettings) {
         settings = s
@@ -265,6 +268,7 @@ fun ExportSheet(engine: EditorEngine, onDismiss: () -> Unit) {
                         busy = true
                         progress = 0f
                         message = null
+                        cancelRequested.set(false)
                         val dir = File(context.filesDir, "exports").apply { mkdirs() }
                         val safeName = engine.doc.name
                             .replace(Regex("[^A-Za-z0-9 _-]"), "")
@@ -274,10 +278,17 @@ fun ExportSheet(engine: EditorEngine, onDismiss: () -> Unit) {
                         val out = File(dir, "${safeName}_${System.currentTimeMillis()}.mp4")
                         val job = active
                         val result = withContext(Dispatchers.Default) {
-                            VideoExporter(engine).export(out, job) { progress = it }
+                            VideoExporter(engine).export(
+                                out,
+                                job,
+                                onProgress = { progress = it },
+                                isCancelled = { cancelRequested.get() },
+                            )
                         }
                         busy = false
-                        message = if (result.error == null) {
+                        message = if (result.cancelled) {
+                            "Export cancelled — the partial file was deleted."
+                        } else if (result.error == null) {
                             buildString {
                                 append("Exported ${out.name} · ${result.frames} frames · ")
                                 append("${job.codec.label}")
@@ -297,6 +308,11 @@ fun ExportSheet(engine: EditorEngine, onDismiss: () -> Unit) {
                     fontWeight = FontWeight.Medium,
                     fontSize = 14.sp,
                 )
+            }
+            if (busy) {
+                TextButton(onClick = { cancelRequested.set(true) }) {
+                    Text("Cancel export", color = MsColors.error, fontSize = 13.sp)
+                }
             }
             Text(
                 "Encoded on-device with MediaCodec from the C++ engine's frames and mixed audio. " +

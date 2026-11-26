@@ -18,6 +18,37 @@ permissions:
   contents: write
 
 jobs:
+  # The engine's own suite (31 binaries) never ran in CI: a change to the
+  # compositor could break every native test and still ship. ffmpeg is installed
+  # because ms_audio_playback_test generates its fixture with the CLI.
+  native-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ms/MotionStudio_Rebuild/native/cpp
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install fixtures dependency
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg
+
+      - name: Configure
+        run: >
+          cmake -S . -B build
+          -DCMAKE_BUILD_TYPE=Release
+          -DMS_BUILD_TESTS=ON
+
+      - name: Build
+        run: cmake --build build -j"$(nproc)"
+
+      # The golden image test lives here too: it fails the build when the
+      # compositor's pixels move beyond tolerance, not only when logic breaks.
+      - name: Run ctest
+        run: ctest --test-dir build --output-on-failure
+
   build:
     runs-on: ubuntu-latest
     defaults:
@@ -63,6 +94,11 @@ jobs:
 
       - name: Build debug APK
         run: ./gradlew :app:assembleDebug --stacktrace
+
+      # The release build is what actually ships: R8 shrinking, resource
+      # stripping and release-only link flags never ran in CI before.
+      - name: Build release APK
+        run: ./gradlew :app:assembleRelease --stacktrace
 
       - name: Collect APK
         run: |

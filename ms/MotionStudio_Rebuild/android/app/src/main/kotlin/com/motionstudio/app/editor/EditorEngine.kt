@@ -258,6 +258,20 @@ class EditorEngine(
         return true
     }
 
+    /**
+     * Opens an autosave as unsaved work. The document is marked dirty and the
+     * current file is cleared, so the next save writes a normal project instead
+     * of overwriting the recovery copy with itself.
+     */
+    fun openRecovered(file: File): Boolean {
+        if (!openFile(file)) return false
+        currentFile = null
+        dirty = true
+        status = "Recovered unsaved work"
+        Diagnostics.note("recovered ${file.name}")
+        return true
+    }
+
     /** Lets the UI report progress (import, export) through the status line. */
 
     // ---- Comp network -------------------------------------------------------
@@ -1826,6 +1840,9 @@ class EditorEngine(
         saving = false
         dirty = false
         lastAutosaveAt = System.currentTimeMillis()
+        // The document is on disk under its real name now, so the recovery copy
+        // has done its job and should not be offered again next launch.
+        runCatching { store.clearAutosave(doc.name) }
         status = "Saved"
         return true
     }
@@ -1833,13 +1850,25 @@ class EditorEngine(
     /** Autosaves at most every 10 minutes, matching the documented recovery policy. */
     fun maybeAutosave() {
         if (!autosaveEnabled() || !dirty || playing) return
-        val now = System.currentTimeMillis()
-        if (now - lastAutosaveAt < AUTOSAVE_INTERVAL_MS) return
+        if (System.currentTimeMillis() - lastAutosaveAt < AUTOSAVE_INTERVAL_MS) return
+        if (forceAutosave()) status = "Autosaved"
+    }
+
+    /**
+     * Writes the recovery copy now, ignoring the interval. Called when the app
+     * goes to the background: a budget phone may never resume this process, so
+     * the interval alone loses the last ten minutes of work.
+     */
+    fun forceAutosave(): Boolean {
+        if (!autosaveEnabled() || !dirty || playing) return false
         val json = NativeEngine.nativeProjectToJson()
-        if (json.isBlank() || json == "{}") return
-        runCatching { store.autosave(doc.name, json) }
-        lastAutosaveAt = now
-        status = "Autosaved"
+        if (json.isBlank() || json == "{}") return false
+        val ok = runCatching { store.autosave(doc.name, json) }.isSuccess
+        if (ok) {
+            lastAutosaveAt = System.currentTimeMillis()
+            Diagnostics.note("autosave ${doc.name} (${json.length} bytes)")
+        }
+        return ok
     }
 
     // ---- Master audio inserts ------------------------------------------------
