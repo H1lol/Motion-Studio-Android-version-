@@ -34,6 +34,12 @@ every decision below is measured against.
   tolerance (max channel 8, mean 0.75). It also asserts each effect changes pixels
   and that a repeated render is byte-identical. Regenerate deliberately with
   `ms_render_golden_test --write` after looking at the diff.
+  `ms_composite_golden_test` does the same one level up, through
+  `Engine::render_frame()`: slate, mask, per-clip grade, master grade and
+  half-scale preview. While writing it, `add_effect` on a clip with no decodable
+  media produced no pixel change — the slate path appears to skip the clip effect
+  stack. On device this would mean a clip whose media failed to open also ignores
+  its effects; it needs a real-media test before being called a bug.
 - **CI.** `.github/workflows/android.yml` now runs the native suite (`ctest`,
   ffmpeg installed for the audio fixture) and builds the release APK, not only the
   debug one. Before this, 32 native tests and the R8/minified build were never

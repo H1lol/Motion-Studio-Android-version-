@@ -235,6 +235,15 @@ target_link_libraries(ms_render_golden_test PRIVATE ms_core)
 target_compile_definitions(ms_render_golden_test PRIVATE
   MS_GOLDEN_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/golden")
 
+# The same idea one level up: whole composited frames from Engine::render_frame,
+# so masks, grades, effect stacks and preview scaling are covered too.
+add_executable(ms_composite_golden_test tools/ms_composite_golden_test.cpp)
+target_link_libraries(ms_composite_golden_test PRIVATE motionstudio_native)
+target_include_directories(ms_composite_golden_test PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_compile_definitions(ms_composite_golden_test PRIVATE
+  MS_GOLDEN_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/golden")
+
 add_executable(ms_engine_audio_test tools/ms_engine_audio_test.cpp)
 target_link_libraries(ms_engine_audio_test PRIVATE motionstudio_native)
 
@@ -277,6 +286,7 @@ add_test(NAME ms_effects_motion_test COMMAND ms_effects_motion_test)
 add_test(NAME ms_effects_looks_test COMMAND ms_effects_looks_test)
 add_test(NAME ms_loudness_test COMMAND ms_loudness_test)
 add_test(NAME ms_render_golden_test COMMAND ms_render_golden_test)
+add_test(NAME ms_composite_golden_test COMMAND ms_composite_golden_test)
 set_tests_properties(
   ms_studio_test ms_pass345_deep ms_pass6_test ms_11_16_test ms_17_22_test
   ms_23_30_test ms_audio_fx_test ms_audio_playback_test ms_graph_safety_test ms_export_profile_test

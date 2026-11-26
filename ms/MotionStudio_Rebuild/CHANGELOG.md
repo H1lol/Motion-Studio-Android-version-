@@ -3,6 +3,11 @@
 ## Unreleased — pixels under test, recovery that works, stoppable jobs
 
 ### Added
+- **A second golden suite for the compositor itself.** `ms_composite_golden_test`
+  renders whole frames through `Engine::render_frame()` — plain slate, shape mask
+  with feather, per-clip grade, master grade and half-scale preview — and compares
+  them with `tests/golden/composite_*.pam`. Each case must also differ from the
+  slate, so a golden cannot lock in an edit that does nothing
 - **Golden-image regression test.** `ms_render_golden_test` renders a fixed scene
   through eleven effects (blur, glow, chromatic, wave warp, kaleidoscope, halftone,
   vhs, twirl, pixelate, duotone, saturation) and compares the result against
@@ -30,9 +35,10 @@
   debug APK was built and no native test ran
 
 ### Verified
-- Native: 32/32 tests pass with `ctest` except `ms_audio_playback_test`, which needs
-  an `ffmpeg` CLI for its fixture (installed in CI, absent in this container).
-  `ms_render_golden_test` PASSED on all eleven effects
+- Native: 32 of 33 tests pass with `ctest`; the only failure is
+  `ms_audio_playback_test`, which needs an `ffmpeg` CLI for its fixture (installed
+  in CI, absent in this container). `ms_render_golden_test` PASSED on all eleven
+  effects and `ms_composite_golden_test` on all five frames
 - JVM: 29/29 (`ScriptExpressionTest` 7, `ProjectDocTest` 6, `MediaImportRulesTest` 4,
   `RecoveryRulesTest` 4, `DeviceProfileTest` 4, `TimelineRulerTest` 4)
 - `:app:assembleRelease` succeeds in 11m 33s: **7,941,362 bytes**,
