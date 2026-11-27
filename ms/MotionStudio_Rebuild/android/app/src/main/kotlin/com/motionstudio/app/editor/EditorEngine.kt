@@ -10,6 +10,8 @@ import com.motionstudio.app.audio.NativeAudioPlayer
 import com.motionstudio.app.data.ProjectStore
 import com.motionstudio.app.diag.Diagnostics
 import com.motionstudio.app.media.ProxyStore
+import com.motionstudio.app.model.CaptionCue
+import com.motionstudio.app.model.Captions
 import com.motionstudio.app.model.ProjectDoc
 import com.motionstudio.app.native.NativeEngine
 import java.io.File
@@ -34,6 +36,27 @@ data class AudioInsert(val index: Int, val kind: Int, val enabled: Boolean)
 
 /** ms::TrackType::Overlay, the lane titles are composited on. */
 internal const val OVERLAY_TRACK_TYPE = 1
+
+/** Lane caption imports reuse so a second import stacks cues, not lanes. */
+internal const val CAPTION_LANE_NAME = "Subtitles"
+
+/**
+ * How imported subtitles look: bottom-centre, white, outlined, at 5.8% of the
+ * canvas height (63 px on a 1080p canvas — the usual broadcast size), never
+ * smaller than 28 px or larger than 160 px in the title rasteriser.
+ */
+internal fun captionTitleOptions(canvasHeight: Int): TitleOptions = TitleOptions(
+    font = "archivo",
+    size = (canvasHeight * 0.058).coerceIn(28.0, 160.0),
+    color = "#FFFFFF",
+    align = 1,
+    anchor = 2,
+    outline = 3.0,
+    outlineColor = "#000000",
+    shadow = 0.0,
+    lineSpacing = 1.1,
+    uppercase = false,
+)
 
 val AUDIO_INSERT_NAMES = listOf("Gain", "Parametric EQ", "Compressor", "Delay", "Reverb", "Limiter")
 
@@ -1497,6 +1520,64 @@ class EditorEngine(
         status = "Title added"
         return true
     }
+
+    /**
+     * Imports a picked `.srt`/`.vtt` as one title clip per cue.
+     *
+     * All cues land on a single lane called [CAPTION_LANE_NAME], created on the
+     * first import and reused afterwards, so re-importing a corrected file adds
+     * a second pass over the same lane instead of a wall of new tracks. Cues are
+     * never merged or re-timed: the file's timing is the point of the file.
+     *
+     * @return the number of clips the rasteriser accepted.
+     */
+    fun importCaptions(raw: String, fileName: String = "captions"): Int {
+        val cues = Captions.parse(raw, fileName)
+        if (cues.isEmpty()) {
+            status = "No timed cues in $fileName"
+            return 0
+        }
+        var lane = doc.tracks.firstOrNull {
+            it.type == OVERLAY_TRACK_TYPE && it.name.equals(CAPTION_LANE_NAME, ignoreCase = true)
+        }
+        if (lane == null) {
+            val newId = NativeEngine.nativeTrackAdd(CAPTION_LANE_NAME, OVERLAY_TRACK_TYPE)
+            if (newId <= 0) {
+                status = "Could not create a subtitle lane"
+                return 0
+            }
+            reload()
+            lane = doc.tracks.firstOrNull { it.id == newId }
+        }
+        if (lane == null) {
+            status = "No subtitle lane to put the cues on"
+            return 0
+        }
+        val opts = captionTitleOptions(doc.height)
+        var added = 0
+        cues.forEach { cue ->
+            val id = NativeEngine.nativeTextAddClip(
+                lane.id, cue.start, cue.duration.coerceAtLeast(1.0 / fps), cue.text,
+                opts.font, opts.size, opts.color, opts.align, opts.anchor,
+                opts.outline, opts.outlineColor, opts.shadow, opts.lineSpacing,
+                opts.tracking, opts.boxWidth, opts.uppercase,
+            )
+            if (id > 0) added++
+        }
+        if (added == 0) {
+            status = "The text rasteriser rejected every cue in $fileName"
+            return 0
+        }
+        selectedTrackId = lane.id
+        selectedClipId = -1
+        markDirty()
+        reload()
+        status = "Imported $added of ${cues.size} cue(s) from $fileName"
+        return added
+    }
+
+    /** Every text clip on the timeline, in time order, ready for export. */
+    fun captionCues(): List<CaptionCue> = Captions.fromTitles(doc.tracks)
 
     /** Re-renders the selected title clip with new text and/or style. */
     fun updateSelectedTitle(text: String, opts: TitleOptions): Boolean {

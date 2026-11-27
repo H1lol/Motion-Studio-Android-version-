@@ -21,6 +21,15 @@
   save writes a normal project, and saving deletes the recovery copy
 - `forceAutosave()` runs on `ON_STOP`, so a background kill no longer costs the up
   to ten minutes the interval-based autosave could miss
+- **SRT and WebVTT captions.** `Captions.parse` reads either format (BOM, CRLF,
+  hours omitted, VTT cue identifiers and settings, `NOTE`/`STYLE` blocks, inline
+  tags, blocks with no blank line between them) into timed cues; the same cues
+  become title clips on one `Subtitles` lane, so a second import stacks on that
+  lane instead of creating tracks. `Export .srt` writes every text clip back out
+  as numbered cues, one file per export under `filesDir/exports`
+- The caption reader is capped at 4 MiB and fails closed: unreadable files and
+  files with no timing line produce a status message, never a crash or an empty
+  lane
 - Cancel buttons for export and proxy generation
 - `docs/INDUSTRY_STANDARD_GAP.md`: the desktop-suite specification mapped against
   what this app actually has, the deliberate omissions, and the phase plan
@@ -39,8 +48,9 @@
   `ms_audio_playback_test`, which needs an `ffmpeg` CLI for its fixture (installed
   in CI, absent in this container). `ms_render_golden_test` PASSED on all eleven
   effects and `ms_composite_golden_test` on all five frames
-- JVM: 29/29 (`ScriptExpressionTest` 7, `ProjectDocTest` 6, `MediaImportRulesTest` 4,
-  `RecoveryRulesTest` 4, `DeviceProfileTest` 4, `TimelineRulerTest` 4)
+- JVM: 39/39 (`CaptionsTest` 10, `ScriptExpressionTest` 7, `ProjectDocTest` 6,
+  `MediaImportRulesTest` 4, `RecoveryRulesTest` 4, `DeviceProfileTest` 4,
+  `TimelineRulerTest` 4)
 - `:app:assembleRelease` succeeds in 11m 33s: **7,941,362 bytes**,
   `native-code: 'arm64-v8a' 'armeabi-v7a'`, `minSdk 29`, version `2026.1.0`
 - Not verified: no device here. Recovery after a real OS kill, the Cancel buttons

@@ -48,6 +48,7 @@ import com.motionstudio.app.export.ExportSettings
 import com.motionstudio.app.media.ProxyGenerator
 import com.motionstudio.app.media.ProxyStore
 import com.motionstudio.app.model.CanvasRatio
+import com.motionstudio.app.model.Captions
 import com.motionstudio.app.model.PreviewRatio
 import com.motionstudio.app.native.NativeEngine
 import com.motionstudio.app.ui.theme.MsColors
@@ -64,6 +65,7 @@ fun MoreSheet(
     onDismiss: () -> Unit,
     onExportFrame: () -> Unit,
     onOpenExport: () -> Unit,
+    onImportCaptions: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var gainDb by remember { mutableFloatStateOf(0f) }
@@ -72,6 +74,7 @@ fun MoreSheet(
     var proxyProgress by remember { mutableFloatStateOf(0f) }
     var proxyStatus by remember { mutableStateOf<String?>(null) }
     var proxyRevision by remember { mutableIntStateOf(0) }
+    var captionStatus by remember { mutableStateOf<String?>(null) }
     // Building proxies for a 4K source takes minutes on a phone; it has to be
     // stoppable without killing the app.
     val proxyCancel = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
@@ -252,6 +255,49 @@ fun MoreSheet(
                         Text("Remove", color = MsColors.textTertiary, fontSize = 11.sp)
                     }
                 }
+            }
+
+            Spacer(Modifier.height(10.dp))
+            SheetSection("CAPTIONS")
+            Text(
+                "${engine.captionCues().size} timed title(s) on the timeline. " +
+                    "SRT and WebVTT are read cue by cue; the same formats are written back.",
+                color = MsColors.textTertiary,
+                fontSize = 11.sp,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = onImportCaptions) {
+                    Text("Import .srt / .vtt", color = MsColors.accentSoft, fontSize = 13.sp)
+                }
+                TextButton(
+                    onClick = {
+                        val cues = engine.captionCues()
+                        if (cues.isEmpty()) {
+                            captionStatus = "No text clips to export yet."
+                            return@TextButton
+                        }
+                        scope.launch {
+                            val written = withContext(Dispatchers.IO) {
+                                runCatching {
+                                    val dir = File(context.filesDir, "exports").apply { mkdirs() }
+                                    val file = File(dir, "captions_${System.currentTimeMillis()}.srt")
+                                    file.writeText(Captions.toSrt(cues), Charsets.UTF_8)
+                                    file
+                                }.getOrNull()
+                            }
+                            captionStatus = if (written == null) {
+                                "Could not write the caption file."
+                            } else {
+                                "Wrote ${cues.size} cue(s) to ${written.absolutePath}"
+                            }
+                        }
+                    },
+                ) {
+                    Text("Export .srt", color = MsColors.textSecondary, fontSize = 13.sp)
+                }
+            }
+            captionStatus?.let {
+                Text(it, color = MsColors.textSecondary, fontSize = 11.sp)
             }
 
             Spacer(Modifier.height(10.dp))

@@ -164,6 +164,30 @@ fun EditorScreen(
         }
     }
 
+    // Subtitles arrive as text files, not media: they must not go through the
+    // video import path, which would try to probe them with the decoder.
+    val captionPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        importScope.launch {
+            val text = withContext(Dispatchers.IO) {
+                runCatching {
+                    context.contentResolver.openInputStream(uri)?.use { input ->
+                        read_utf8_capped(input, MAX_CAPTION_BYTES)
+                    }
+                }.getOrNull()
+            }
+            if (text.isNullOrBlank()) {
+                engine.note("Could not read that caption file")
+                return@launch
+            }
+            val name = uri.lastPathSegment?.substringAfterLast('/')?.ifBlank { null }
+                ?: "captions.srt"
+            engine.importCaptions(text, name)
+        }
+    }
+
     LaunchedEffect(engine.status) {
         snackbar.showSnackbar(engine.status)
     }
@@ -273,6 +297,11 @@ fun EditorScreen(
                     onOpenExport = {
                         showMore = false
                         showExport = true
+                    },
+                    onImportCaptions = {
+                        captionPicker.launch(
+                            arrayOf("text/*", "application/x-subrip", "application/octet-stream")
+                        )
                     },
                 )
             }
@@ -725,6 +754,28 @@ private fun ViewportClock(engine: EditorEngine) {
         fontSize = 10.sp,
         fontFamily = MsFonts.mono,
     )
+}
+
+/**
+ * A caption file is text a user picked; 4 MiB is far past any real subtitle
+ * track for a feature-length cut and small enough that a wrong pick (a video
+ * renamed `.srt`) cannot exhaust the heap. 4 × 1024 × 1024.
+ */
+private const val MAX_CAPTION_BYTES = 4 * 1024 * 1024
+
+/** Reads at most [limit] bytes as UTF-8; the rest of the stream is discarded. */
+private fun read_utf8_capped(input: java.io.InputStream, limit: Int): String {
+    val out = java.io.ByteArrayOutputStream()
+    val buffer = ByteArray(16 * 1024)
+    var total = 0
+    while (total < limit) {
+        val read = input.read(buffer)
+        if (read < 0) break
+        val take = minOf(read, limit - total)
+        out.write(buffer, 0, take)
+        total += take
+    }
+    return out.toString("UTF-8")
 }
 
 /** Picks a filename that does not collide with an earlier import. */

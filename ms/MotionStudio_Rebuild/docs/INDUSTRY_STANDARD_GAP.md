@@ -81,8 +81,13 @@ import/proxy/export, device validation via the diagnostics report.
 **Phase B — finish the editor that exists**
 Auto-proxy on import instead of a menu action; keyframe dragging in the curve
 editor (still the largest "unfinished" tell); text depth (per-character animators,
-safe margins); audio waveform and sync verification; export queue with resume;
-SRT/WebVTT captions.
+safe margins); audio waveform and sync verification; export queue with resume.
+
+Done in Phase B so far: **SRT/WebVTT captions** (`Captions.parse`, `toSrt`,
+`toVtt`, one `Subtitles` overlay lane, `Export .srt` from every text clip). Cue
+timing is preserved exactly and the interchange formats are read without a third
+party parser; styling and karaoke timing are deliberately not imported because the
+title model cannot represent them and a silent downgrade would be a lie.
 
 **Phase C — one discipline deeper, not four**
 Mobile compositing: spline roto, paint/clone, chroma keyer, 2D point tracking.
